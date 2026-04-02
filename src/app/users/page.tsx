@@ -152,6 +152,7 @@ function getAdapter() {
     userModel,
     userIdField,
     usernameField: pickField(userModel, ["username", "name", "fullName"]),
+    fullNameField: pickField(userModel, ["fullName"]),
     passwordField: pickField(userModel, ["passwordHash", "password", "hash"]),
     roleField: pickField(userModel, ["role", "userRole"]),
     activeField: pickField(userModel, ["isActive", "active", "enabled"]),
@@ -159,7 +160,7 @@ function getAdapter() {
   };
 }
 
-async function createSellerAction(formData: FormData) {
+async function createUserAction(formData: FormData) {
   "use server";
 
   await ensureOwner();
@@ -168,9 +169,11 @@ async function createSellerAction(formData: FormData) {
   if (!adapter.userModel) return;
 
   const username = String(formData.get("username") ?? "").trim();
+  const fullName = String(formData.get("fullName") ?? "").trim();
   const password = String(formData.get("password") ?? "").trim();
+  const role = String(formData.get("role") ?? "SELLER").trim().toUpperCase();
 
-  if (!username || !password) return;
+  if (!username || !password || (role !== "SELLER" && role !== "OWNER")) return;
 
   const existing = await adapter.client[adapter.userModel.delegate].findFirst({
     where: adapter.usernameField
@@ -187,8 +190,9 @@ async function createSellerAction(formData: FormData) {
 
   const data: Record<string, any> = {};
   if (adapter.usernameField) data[adapter.usernameField.name] = username;
+  if (adapter.fullNameField) data[adapter.fullNameField.name] = fullName || null;
   if (adapter.passwordField) data[adapter.passwordField.name] = passwordHash;
-  if (adapter.roleField) data[adapter.roleField.name] = "SELLER";
+  if (adapter.roleField) data[adapter.roleField.name] = role;
   if (adapter.activeField) data[adapter.activeField.name] = true;
 
   await adapter.client[adapter.userModel.delegate].create({ data });
@@ -207,6 +211,22 @@ async function toggleUserAction(formData: FormData) {
   const nextActive = String(formData.get("nextActive") ?? "false") === "true";
 
   if (!userId) return;
+
+  const current = await adapter.client[adapter.userModel.delegate].findUnique({
+    where: {
+      [adapter.userIdField.name]: coerceByField(userId, adapter.userIdField),
+    },
+  });
+
+  if (!current) return;
+
+  const role = String(getValue(current, [adapter.roleField?.name, "role"], "")).toUpperCase();
+  const username = String(getValue(current, [adapter.usernameField?.name, "username"], ""));
+
+  if (role === "OWNER" && username === "SMSM" && nextActive === false) {
+    revalidatePath("/users");
+    return;
+  }
 
   await adapter.client[adapter.userModel.delegate].update({
     where: {
@@ -270,6 +290,7 @@ export default async function UsersPage() {
       username: String(
         getValue(user, [adapter.usernameField?.name, "username", "name"], "-")
       ),
+      fullName: String(getValue(user, [adapter.fullNameField?.name, "fullName"], "")),
       role,
       isActive: Boolean(
         getValue(user, [adapter.activeField?.name, "isActive", "active"], true)
@@ -301,7 +322,7 @@ export default async function UsersPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold tracking-tight">إدارة المستخدمين</h1>
           <p className="mt-2 text-sm text-white/60">
-            صفحة مالك فقط لإنشاء حسابات البائعين وإدارة التفعيل وإعادة تعيين كلمات المرور.
+            صفحة مالك فقط لإنشاء الحسابات وإدارة التفعيل وإعادة تعيين كلمات المرور والصلاحيات.
           </p>
         </div>
 
@@ -331,19 +352,28 @@ export default async function UsersPage() {
 
         <section className="mb-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
           <div className="mb-5">
-            <h2 className="text-xl font-extrabold">إنشاء بائع جديد</h2>
+            <h2 className="text-xl font-extrabold">إنشاء مستخدم جديد</h2>
             <p className="mt-1 text-sm text-white/55">
-              يتم إنشاء الحساب كبائع فقط، مع تخزين كلمة المرور بالهاش الموجود في النظام.
+              يمكنك إنشاء بائع أو مالك جديد بنفس صلاحيات المالك الحالي.
             </p>
           </div>
 
-          <form action={createSellerAction} className="grid gap-4 md:grid-cols-3">
+          <form action={createUserAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
               <span className="mb-2 block text-sm text-white/65">اسم المستخدم</span>
               <input
                 name="username"
                 required
-                placeholder="اسم حساب البائع"
+                placeholder="اسم الحساب"
+                className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
+              />
+            </label>
+
+            <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
+              <span className="mb-2 block text-sm text-white/65">الاسم الكامل</span>
+              <input
+                name="fullName"
+                placeholder="الاسم الكامل"
                 className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
               />
             </label>
@@ -359,9 +389,25 @@ export default async function UsersPage() {
               />
             </label>
 
-            <div className="flex items-end">
+            <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
+              <span className="mb-2 block text-sm text-white/65">الدور</span>
+              <select
+                name="role"
+                defaultValue="SELLER"
+                className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none focus:border-red-500/60"
+              >
+                <option value="SELLER" className="bg-black">
+                  بائع
+                </option>
+                <option value="OWNER" className="bg-black">
+                  مالك
+                </option>
+              </select>
+            </label>
+
+            <div className="md:col-span-2 xl:col-span-4">
               <button className="h-11 w-full rounded-xl bg-red-600 px-6 text-sm font-extrabold transition hover:bg-red-500">
-                إنشاء الحساب
+                إنشاء المستخدم
               </button>
             </div>
           </form>
@@ -373,10 +419,11 @@ export default async function UsersPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[1100px] w-full text-right">
+            <table className="min-w-[1200px] w-full text-right">
               <thead className="bg-white/[0.03] text-sm text-white/70">
                 <tr>
                   <th className="px-4 py-4">اسم المستخدم</th>
+                  <th className="px-4 py-4">الاسم الكامل</th>
                   <th className="px-4 py-4">الدور</th>
                   <th className="px-4 py-4">الحالة</th>
                   <th className="px-4 py-4">تاريخ الإنشاء</th>
@@ -388,17 +435,19 @@ export default async function UsersPage() {
               <tbody>
                 {mapped.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-16 text-center text-sm text-white/45">
+                    <td colSpan={7} className="px-4 py-16 text-center text-sm text-white/45">
                       لا يوجد مستخدمون.
                     </td>
                   </tr>
                 ) : (
                   mapped.map((user) => {
                     const isOwner = user.role === "OWNER";
+                    const isMainOwner = user.username === "SMSM" && isOwner;
 
                     return (
                       <tr key={user.id} className="border-t border-white/10 align-top">
                         <td className="px-4 py-4 font-bold">{user.username}</td>
+                        <td className="px-4 py-4 text-white/75">{user.fullName || "-"}</td>
 
                         <td className="px-4 py-4">
                           <span
@@ -427,7 +476,7 @@ export default async function UsersPage() {
                         <td className="px-4 py-4 text-white/65">{user.createdAt}</td>
 
                         <td className="px-4 py-4">
-                          {!isOwner ? (
+                          {!isMainOwner ? (
                             <form action={resetPasswordAction} className="flex gap-2">
                               <input type="hidden" name="userId" value={user.id} />
                               <input
@@ -442,12 +491,12 @@ export default async function UsersPage() {
                               </button>
                             </form>
                           ) : (
-                            <span className="text-sm text-white/35">غير متاح للمالك</span>
+                            <span className="text-sm text-white/35">محمي</span>
                           )}
                         </td>
 
                         <td className="px-4 py-4">
-                          {!isOwner ? (
+                          {!isMainOwner ? (
                             <form action={toggleUserAction}>
                               <input type="hidden" name="userId" value={user.id} />
                               <input

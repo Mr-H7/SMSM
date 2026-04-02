@@ -1,374 +1,319 @@
-import Image from "next/image";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/rbac";
+import * as rbac from "@/lib/rbac";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-function startOfToday() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+export const dynamic = "force-dynamic";
+
+async function getCurrentUser() {
+  const requireUser = (rbac as any).requireUser;
+  if (typeof requireUser === "function") {
+    try {
+      return await requireUser();
+    } catch {
+      return null;
+    }
+  }
+
+  const getSessionUser =
+    (rbac as any).getCurrentUser ??
+    (rbac as any).getSessionUser ??
+    (rbac as any).getUserFromSession;
+
+  if (typeof getSessionUser === "function") {
+    return await getSessionUser();
+  }
+
+  return null;
 }
 
-function currency(n: number) {
-  return new Intl.NumberFormat("ar-EG").format(n || 0);
+async function logoutAction() {
+  "use server";
+
+  const cookieStore = await cookies();
+  cookieStore.set("smsm_session", "", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    expires: new Date(0),
+  });
+
+  redirect("/login");
+}
+
+function formatEGP(value: number) {
+  return new Intl.NumberFormat("ar-EG", {
+    style: "currency",
+    currency: "EGP",
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 export default async function DashboardPage() {
-  const user = await requireUser();
-  const isOwner = user.role === "OWNER";
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
 
-  const todayStart = startOfToday();
+  const today = startOfToday();
 
-  const salesWhere = isOwner
-    ? { createdAt: { gte: todayStart } }
-    : { createdAt: { gte: todayStart }, sellerId: user.id };
-
-  const allSalesWhere = isOwner ? {} : { sellerId: user.id };
-
-  const [
-    totalProducts,
-    lowStockCount,
-    outOfStockCount,
-    todaySalesCount,
-    totalSalesCount,
-    todayReturnsCount,
-    totalReturnsCount,
-    totalUsers,
-    todaySales,
-    todayReturns,
-  ] = await Promise.all([
-    prisma.productVariant.count(),
-    prisma.productVariant.count({
-      where: { stockQty: { gt: 0, lte: 7 } },
-    }),
-    prisma.productVariant.count({
-      where: { stockQty: { lte: 0 } },
-    }),
-    prisma.sale.count({
-      where: salesWhere,
-    }),
-    prisma.sale.count({
-      where: allSalesWhere,
-    }),
-    prisma.saleReturn.count({
-      where: isOwner
-        ? { createdAt: { gte: todayStart } }
-        : {
-            createdAt: { gte: todayStart },
-            sale: { sellerId: user.id },
+  const [productsCount, lowStockCount, todaySales, todayReturns, usersCount, invoicesCount] =
+    await Promise.all([
+      prisma.productVariant.count(),
+      prisma.productVariant.count({
+        where: {
+          stockQty: {
+            lte: 7,
           },
-    }),
-    prisma.saleReturn.count({
-      where: isOwner
-        ? {}
-        : {
-            sale: { sellerId: user.id },
+        },
+      }),
+      prisma.sale.findMany({
+        where: {
+          createdAt: {
+            gte: today,
           },
-    }),
-    isOwner ? prisma.user.count() : Promise.resolve(0),
-    prisma.sale.findMany({
-      where: salesWhere,
-      select: {
-        total: true,
-        discount: true,
-      },
-    }),
-    prisma.saleReturn.findMany({
-      where: isOwner
-        ? { createdAt: { gte: todayStart } }
-        : {
-            createdAt: { gte: todayStart },
-            sale: { sellerId: user.id },
+        },
+      }),
+      prisma.saleReturn.findMany({
+        where: {
+          createdAt: {
+            gte: today,
           },
-      select: {
-        refundAmount: true,
-      },
-    }),
-  ]);
+        },
+      }),
+      prisma.user.count(),
+      prisma.sale.count(),
+    ]);
 
-  const todaySalesAmount = todaySales.reduce((sum, s) => sum + (s.total || 0), 0);
-  const todayDiscountAmount = todaySales.reduce((sum, s) => sum + (s.discount || 0), 0);
-  const todayReturnsAmount = todayReturns.reduce((sum, r) => sum + (r.refundAmount || 0), 0);
+  const todaySalesValue = todaySales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+  const todayDiscounts = todaySales.reduce((sum, sale) => sum + (sale.discount || 0), 0);
+  const todayReturnsValue = todayReturns.reduce((sum, r) => sum + (r.refundAmount || 0), 0);
+
+  const role = String(user.role ?? user.userRole ?? "").toUpperCase();
+  const isOwner = role === "OWNER";
 
   return (
-    <div dir="rtl" className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="mb-8 overflow-hidden rounded-[28px] border border-red-900/40 bg-gradient-to-br from-red-950/35 via-black to-black p-6">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-                <Image
-                  src="/smsm-logo.png"
-                  alt="SMSM Logo"
-                  width={80}
-                  height={80}
-                  className="h-full w-full object-contain p-2"
-                  priority
-                />
-              </div>
-
-              <div>
-                <h1 className="text-3xl font-black">
-                  لوحة تحكم <span className="text-white">SMSM</span>
-                </h1>
-                <p className="mt-1 text-sm text-white/65">
-                  نظام إدارة محل الأحذية — واجهة تشغيل تجارية عربية نظيفة
-                </p>
-
-                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-                  <span>{isOwner ? "OWNER" : "SELLER"}</span>
-                  <span className="text-white/35">•</span>
-                  <span className="font-bold">{user.username}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <NavTab href="/sales/new" label="بيع جديد" active />
-              <NavTab href="/products" label="المنتجات" />
-              <NavTab href="/invoices" label="الفواتير" />
-              {isOwner ? <NavTab href="/reports" label="التقارير" /> : <NavTab href="/returns" label="المرتجعات" />}
-              <NavTab href="/shift-close" label="إغلاق الوردية" />
-              {isOwner ? <NavTab href="/returns" label="المرتجعات" /> : <span />}
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <SimpleBox
-            title="إجمالي المنتجات"
-            value={totalProducts}
-            note="عدد النسخ الموجودة في النظام"
-          />
-          <SimpleBox
-            title="مخزون منخفض"
-            value={lowStockCount}
-            note="من 1 إلى 7"
-            tone="red"
-          />
-          <SimpleBox
-            title="نفد المخزون"
-            value={outOfStockCount}
-            note="يحتاج إعادة تخزين"
-            tone="red"
-          />
-          <SimpleBox
-            title="مبيعات اليوم"
-            value={todaySalesCount}
-            note="عدد الفواتير اليوم"
-            tone="dark"
-          />
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-3">
-          <div className="xl:col-span-2 space-y-6">
-            <SectionCard title="ملخص اليوم">
-              <div className="grid gap-4 md:grid-cols-3">
-                <MetricCard
-                  title="إجمالي مبيعات اليوم"
-                  value={`${currency(todaySalesAmount)} ج.م`}
-                />
-                <MetricCard
-                  title="خصومات اليوم"
-                  value={`${currency(todayDiscountAmount)} ج.م`}
-                />
-                <MetricCard
-                  title="مرتجعات اليوم"
-                  value={`${currency(todayReturnsAmount)} ج.م`}
-                />
-              </div>
-            </SectionCard>
-
-            <SectionCard title="الوصول السريع">
-              <div className="grid gap-3 md:grid-cols-2">
-                <QuickCard href="/sales/new" title="إنشاء فاتورة جديدة" desc="ابدأ عملية بيع جديدة بسرعة." />
-                <QuickCard href="/products" title="المنتجات والمخزون" desc="عرض المنتجات وإعادة التخزين والمتابعة." />
-                <QuickCard href="/invoices" title="عرض الفواتير" desc="تفاصيل الفواتير والطباعة." />
-                <QuickCard href="/returns" title="المرتجعات والاستبدال" desc="استرجاع واستبدال وربط بالفواتير." />
-                <QuickCard href="/shift-close" title="إغلاق الوردية" desc="إنهاء الوردية وطباعة الملخص." />
-                {isOwner ? (
-                  <QuickCard href="/targets" title="الأهداف" desc="إدارة هدف اليوم والشهر والبائعين." />
-                ) : null}
-              </div>
-            </SectionCard>
-          </div>
-
-          <div className="space-y-6">
-            <SectionCard title="ملخص التشغيل">
-              <MiniRow label="إجمالي الفواتير" value={totalSalesCount} />
-              <MiniRow label="مرتجعات مسجلة" value={totalReturnsCount} />
-              {isOwner ? <MiniRow label="عدد المستخدمين" value={totalUsers} /> : null}
-              <MiniRow label="فواتير اليوم" value={todaySalesCount} />
-              <MiniRow label="مرتجعات اليوم" value={todayReturnsCount} />
-            </SectionCard>
-
-            <SectionCard title="تنبيهات سريعة">
-              <MiniRow label="منتجات منخفضة" value={lowStockCount} tone={lowStockCount > 0 ? "warn" : "ok"} />
-              <MiniRow label="منتجات نافدة" value={outOfStockCount} tone={outOfStockCount > 0 ? "danger" : "ok"} />
+    <main dir="rtl" className="min-h-screen bg-black text-white">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="mb-8 rounded-[28px] border border-red-500/20 bg-gradient-to-b from-red-950/20 to-white/[0.02] p-5">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/sales/new"
+                className="inline-flex h-12 items-center rounded-2xl bg-red-600 px-5 text-sm font-extrabold transition hover:bg-red-500"
+              >
+                بيع جديد
+              </Link>
               <Link
                 href="/products"
-                className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-bold text-black transition hover:bg-white/90"
+                className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
               >
-                فتح صفحة المخزون
+                المنتجات
               </Link>
-            </SectionCard>
+              <Link
+                href="/invoices"
+                className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
+              >
+                الفواتير
+              </Link>
+              <Link
+                href="/returns"
+                className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
+              >
+                المرتجعات
+              </Link>
+              {isOwner ? (
+                <>
+                  <Link
+                    href="/targets"
+                    className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
+                  >
+                    الأهداف
+                  </Link>
+                  <Link
+                    href="/users"
+                    className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
+                  >
+                    المستخدمون
+                  </Link>
+                </>
+              ) : null}
 
-            {isOwner ? (
-              <SectionCard title="لوحات الإدارة">
-                <div className="space-y-3">
-                  <SideLink href="/reports" label="التقارير" />
-                  <SideLink href="/reports/profit" label="تقرير الأرباح" />
-                  <SideLink href="/targets" label="الأهداف" />
-                  <SideLink href="/users" label="إدارة المستخدمين" />
-                </div>
-              </SectionCard>
-            ) : null}
+              <form action={logoutAction}>
+                <button className="inline-flex h-12 items-center rounded-2xl border border-red-500/30 bg-red-600/15 px-5 text-sm font-extrabold text-red-200 transition hover:bg-red-600/25">
+                  تسجيل الخروج
+                </button>
+              </form>
+            </div>
+
+            <div className="text-right">
+              <h1 className="text-4xl font-black tracking-tight">لوحة تحكم SMSM</h1>
+              <p className="mt-2 text-sm text-white/60">
+                نظام إدارة محل الأحذية — واجهة تشغيل تجارية عربية منظمة
+              </p>
+              <div className="mt-3 inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold">
+                {user.username} · {role}
+              </div>
+            </div>
           </div>
+        </section>
+
+        <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-sm text-white/60">مبيعات اليوم</div>
+            <div className="mt-3 text-3xl font-black">{todaySales.length}</div>
+            <div className="mt-2 text-sm text-white/50">عدد الفواتير اليوم</div>
+          </div>
+
+          <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-5">
+            <div className="text-sm text-red-100/80">نفد المخزون</div>
+            <div className="mt-3 text-3xl font-black text-red-300">
+              {await prisma.productVariant.count({ where: { stockQty: 0 } })}
+            </div>
+            <div className="mt-2 text-sm text-red-100/60">يحتاج إعادة تخزين</div>
+          </div>
+
+          <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-5">
+            <div className="text-sm text-yellow-100/80">مخزون منخفض</div>
+            <div className="mt-3 text-3xl font-black text-yellow-300">{lowStockCount}</div>
+            <div className="mt-2 text-sm text-yellow-100/60">من 1 إلى 7</div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+            <div className="text-sm text-white/60">إجمالي المنتجات</div>
+            <div className="mt-3 text-3xl font-black">{productsCount}</div>
+            <div className="mt-2 text-sm text-white/50">عدد النسخ الموجودة في النظام</div>
+          </div>
+        </section>
+
+        <div className="grid gap-6 xl:grid-cols-3">
+          <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+            <h2 className="mb-5 text-2xl font-extrabold">ملخص التشغيل</h2>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
+                <span className="text-white/70">إجمالي الفواتير</span>
+                <span className="text-xl font-black">{invoicesCount}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
+                <span className="text-white/70">مرتجعات مسجلة</span>
+                <span className="text-xl font-black">{await prisma.saleReturn.count()}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
+                <span className="text-white/70">عدد المستخدمين</span>
+                <span className="text-xl font-black">{usersCount}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
+                <span className="text-white/70">فواتير اليوم</span>
+                <span className="text-xl font-black">{todaySales.length}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
+                <span className="text-white/70">مرتجعات اليوم</span>
+                <span className="text-xl font-black">{todayReturns.length}</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="xl:col-span-2 space-y-6">
+            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+              <h2 className="mb-5 text-2xl font-extrabold">ملخص اليوم</h2>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+                  <div className="text-sm text-white/60">إجمالي مبيعات اليوم</div>
+                  <div className="mt-3 text-3xl font-black">{formatEGP(todaySalesValue)}</div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+                  <div className="text-sm text-white/60">خصومات اليوم</div>
+                  <div className="mt-3 text-3xl font-black">{formatEGP(todayDiscounts)}</div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
+                  <div className="text-sm text-white/60">مرتجعات اليوم</div>
+                  <div className="mt-3 text-3xl font-black">{formatEGP(todayReturnsValue)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+              <h2 className="mb-5 text-2xl font-extrabold">الوصول السريع</h2>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Link
+                  href="/products"
+                  className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
+                >
+                  <div className="text-lg font-extrabold">المنتجات والمخزون</div>
+                  <div className="mt-2 text-sm text-white/55">
+                    عرض المنتجات وإعادة التخزين والمتابعة.
+                  </div>
+                </Link>
+
+                <Link
+                  href="/sales/new"
+                  className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
+                >
+                  <div className="text-lg font-extrabold">إنشاء فاتورة جديدة</div>
+                  <div className="mt-2 text-sm text-white/55">
+                    ابدأ عملية بيع جديدة بسرعة.
+                  </div>
+                </Link>
+
+                <Link
+                  href="/returns"
+                  className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
+                >
+                  <div className="text-lg font-extrabold">المرتجعات والاستبدال</div>
+                  <div className="mt-2 text-sm text-white/55">
+                    استرجاع أو استبدال وربط بالفواتير.
+                  </div>
+                </Link>
+
+                <Link
+                  href="/invoices"
+                  className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
+                >
+                  <div className="text-lg font-extrabold">عرض الفواتير</div>
+                  <div className="mt-2 text-sm text-white/55">
+                    تفاصيل الفواتير والطباعة والمتابعة.
+                  </div>
+                </Link>
+
+                {isOwner ? (
+                  <>
+                    <Link
+                      href="/targets"
+                      className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
+                    >
+                      <div className="text-lg font-extrabold">الأهداف</div>
+                      <div className="mt-2 text-sm text-white/55">
+                        إدارة هدف اليوم والشهر والبائعين.
+                      </div>
+                    </Link>
+
+                    <Link
+                      href="/users"
+                      className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
+                    >
+                      <div className="text-lg font-extrabold">المستخدمون</div>
+                      <div className="mt-2 text-sm text-white/55">
+                        إنشاء وإدارة الحسابات والصلاحيات.
+                      </div>
+                    </Link>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </section>
         </div>
       </div>
-    </div>
-  );
-}
-
-function NavTab({
-  href,
-  label,
-  active = false,
-}: {
-  href: string;
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`rounded-2xl border px-5 py-3 text-center text-sm font-bold transition ${
-        active
-          ? "border-red-500 bg-red-600 text-white hover:bg-red-500"
-          : "border-white/10 bg-black/60 text-white hover:bg-white/10"
-      }`}
-    >
-      {label}
-    </Link>
-  );
-}
-
-function SimpleBox({
-  title,
-  value,
-  note,
-  tone = "dark",
-}: {
-  title: string;
-  value: string | number;
-  note: string;
-  tone?: "dark" | "red";
-}) {
-  return (
-    <div
-      className={`rounded-[26px] border p-6 ${
-        tone === "red"
-          ? "border-red-800/60 bg-gradient-to-br from-red-950/60 to-black"
-          : "border-white/10 bg-[#05070b]"
-      }`}
-    >
-      <div className="text-sm text-white/70">{title}</div>
-      <div className={`mt-3 text-5xl font-black ${tone === "red" ? "text-red-400" : "text-white"}`}>
-        {value}
-      </div>
-      <div className="mt-3 text-sm text-white/45">{note}</div>
-    </div>
-  );
-}
-
-function SectionCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-[26px] border border-white/10 bg-[#05070b] p-5">
-      <h2 className="mb-4 text-xl font-bold">{title}</h2>
-      {children}
-    </div>
-  );
-}
-
-function MetricCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
-      <div className="text-sm text-white/65">{title}</div>
-      <div className="mt-3 text-2xl font-black">{value}</div>
-    </div>
-  );
-}
-
-function QuickCard({
-  href,
-  title,
-  desc,
-}: {
-  href: string;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-2xl border border-white/10 bg-black/30 p-4 transition hover:border-red-500/30 hover:bg-white/5"
-    >
-      <div className="text-base font-bold">{title}</div>
-      <div className="mt-2 text-sm leading-6 text-white/60">{desc}</div>
-    </Link>
-  );
-}
-
-function MiniRow({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "default" | "ok" | "warn" | "danger";
-}) {
-  const cls =
-    tone === "ok"
-      ? "text-green-400"
-      : tone === "warn"
-      ? "text-yellow-300"
-      : tone === "danger"
-      ? "text-red-400"
-      : "text-white";
-
-  return (
-    <div className="mb-3 flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-3 last:mb-0">
-      <span className="text-white/70">{label}</span>
-      <span className={`font-bold ${cls}`}>{value}</span>
-    </div>
-  );
-}
-
-function SideLink({
-  href,
-  label,
-}: {
-  href: string;
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="block rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm font-medium transition hover:bg-white/5"
-    >
-      {label}
-    </Link>
+    </main>
   );
 }
