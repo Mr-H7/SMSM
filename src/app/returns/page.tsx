@@ -3,6 +3,7 @@ import * as rbac from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ReturnType as PrismaReturnType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -10,63 +11,12 @@ type SearchParamsLike =
   | Record<string, string | string[] | undefined>
   | Promise<Record<string, string | string[] | undefined>>;
 
-type ModelField = {
-  name: string;
-  kind?: string;
-  type?: string;
-  isId?: boolean;
-};
-
-type ModelInfo = {
-  name: string;
-  delegate: string;
-  fields: ModelField[];
-};
-
-type InvoiceItemView = {
-  id: string;
-  soldQty: number;
-  returnedQty: number;
-  remainingQty: number;
-  unitPrice: number;
-  title: string;
-  variantId: string | null;
-};
-
-type InvoiceView = {
-  dbId: string;
-  publicId: string;
-  customer: string;
-  seller: string;
-  total: number;
-  discount: number;
-  dateText: string;
-  items: InvoiceItemView[];
-  rawHasItemsRelation: boolean;
-};
-
-type ReplacementVariantView = {
-  id: string;
-  label: string;
-  stockQty: number;
-  sellPrice: number;
-};
-
-type MiniInvoiceCard = {
-  dbId: string;
-  publicId: string;
-  customer: string;
-  seller: string;
-  total: number;
-  dateText: string;
-};
-
-function normalize(value: string) {
-  return value.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-}
-
-function lowerCamel(value: string) {
-  return value.length ? value[0].toLowerCase() + value.slice(1) : value;
+function formatEGP(value: number) {
+  return new Intl.NumberFormat("ar-EG", {
+    style: "currency",
+    currency: "EGP",
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
 }
 
 function toNumber(value: unknown, fallback = 0) {
@@ -74,118 +24,26 @@ function toNumber(value: unknown, fallback = 0) {
   return Number.isFinite(num) ? num : fallback;
 }
 
-function formatEGP(value: number) {
-  return new Intl.NumberFormat("ar-EG", {
-    style: "currency",
-    currency: "EGP",
-    maximumFractionDigits: 2,
-  }).format(Number.isFinite(value) ? value : 0);
-}
-
-function getRuntimeModels(client: any): Record<string, any> {
-  if (client?._runtimeDataModel?.models) return client._runtimeDataModel.models;
-  if (client?._baseDmmf?.modelMap) return client._baseDmmf.modelMap;
-
-  const models = client?._dmmf?.datamodel?.models;
-  if (Array.isArray(models)) {
-    return Object.fromEntries(models.map((m: any) => [m.name, m]));
-  }
-
-  return {};
-}
-
-function getModelFields(meta: any): ModelField[] {
-  if (!meta) return [];
-  if (Array.isArray(meta.fields)) return meta.fields;
-  if (meta.fields && typeof meta.fields === "object") return Object.values(meta.fields);
-  return [];
-}
-
-function findModelInfo(client: any, candidates: string[]): ModelInfo | null {
-  const runtimeModels = getRuntimeModels(client);
-  const delegateKeys = Object.keys(client).filter((key) => {
-    const value = client[key];
-    return value && typeof value.findMany === "function";
-  });
-
-  for (const [modelName, meta] of Object.entries(runtimeModels)) {
-    const match = candidates.some((candidate) => {
-      const a = normalize(candidate);
-      const b = normalize(String(modelName));
-      return a === b || a.includes(b) || b.includes(a);
-    });
-
-    if (!match) continue;
-
-    const delegate =
-      delegateKeys.find((key) => normalize(key) === normalize(lowerCamel(String(modelName)))) ??
-      delegateKeys.find((key) => normalize(key) === normalize(String(modelName))) ??
-      lowerCamel(String(modelName));
-
-    if (client[delegate] && typeof client[delegate].findMany === "function") {
-      return {
-        name: String(modelName),
-        delegate,
-        fields: getModelFields(meta),
-      };
+async function getCurrentUser() {
+  const requireUser = (rbac as any).requireUser;
+  if (typeof requireUser === "function") {
+    try {
+      return await requireUser();
+    } catch {
+      return null;
     }
   }
 
-  for (const candidate of candidates) {
-    const delegate =
-      delegateKeys.find((key) => normalize(key) === normalize(candidate)) ??
-      delegateKeys.find((key) => normalize(key) === normalize(lowerCamel(candidate)));
+  const getSessionUser =
+    (rbac as any).getCurrentUser ??
+    (rbac as any).getSessionUser ??
+    (rbac as any).getUserFromSession;
 
-    if (delegate) {
-      return {
-        name: candidate,
-        delegate,
-        fields: [],
-      };
-    }
+  if (typeof getSessionUser === "function") {
+    return await getSessionUser();
   }
 
   return null;
-}
-
-function pickField(model: ModelInfo | null, candidates: string[]) {
-  if (!model) return null;
-  return (
-    model.fields.find((field) =>
-      candidates.some((candidate) => normalize(candidate) === normalize(field.name))
-    ) ?? null
-  );
-}
-
-function pickRelation(model: ModelInfo | null, targetModelName: string | null) {
-  if (!model || !targetModelName) return null;
-
-  return (
-    model.fields.find((field) => {
-      const kind = String(field.kind ?? "").toLowerCase();
-      return (
-        (kind === "object" || kind === "relation") &&
-        (normalize(String(field.type ?? "")) === normalize(targetModelName) ||
-          normalize(field.name).includes(normalize(targetModelName)))
-      );
-    }) ?? null
-  );
-}
-
-function getValue(obj: any, keys: Array<string | undefined | null>, fallback: any = "") {
-  for (const key of keys) {
-    if (!key) continue;
-    if (obj && obj[key] !== undefined && obj[key] !== null) return obj[key];
-  }
-  return fallback;
-}
-
-function coerceByField(value: unknown, field?: ModelField | null) {
-  if (!field) return value;
-  const type = String(field.type ?? "").toLowerCase();
-  if (["int", "bigint", "float", "decimal"].includes(type)) return Number(value);
-  if (type === "boolean") return value === true || value === "true" || value === "1" || value === 1;
-  return value;
 }
 
 async function ensureLoggedIn() {
@@ -195,610 +53,217 @@ async function ensureLoggedIn() {
   }
 }
 
-function getAdapter() {
-  const client: any = prisma as any;
-
-  const invoiceModel = findModelInfo(client, ["Invoice", "Sale", "SalesInvoice", "Order"]);
-  const itemModel = findModelInfo(client, ["InvoiceItem", "SaleItem", "OrderItem"]);
-  const variantModel = findModelInfo(client, ["ProductVariant", "Variant", "InventoryItem", "ItemVariant"]);
-  const userModel = findModelInfo(client, ["User", "AppUser"]);
-
-  const invoiceIdField =
-    pickField(invoiceModel, ["id", "invoicePk"]) ??
-    invoiceModel?.fields.find((f) => f.isId) ??
-    null;
-
-  const itemIdField =
-    pickField(itemModel, ["id", "itemId"]) ??
-    itemModel?.fields.find((f) => f.isId) ??
-    null;
-
-  const variantIdField =
-    pickField(variantModel, ["id", "variantId"]) ??
-    variantModel?.fields.find((f) => f.isId) ??
-    null;
-
-  const invoiceItemsRelation = pickRelation(invoiceModel, itemModel?.name ?? null);
-  const itemVariantRelation = pickRelation(itemModel, variantModel?.name ?? null);
-  const invoiceSellerRelation = pickRelation(invoiceModel, userModel?.name ?? null);
-
-  return {
-    client,
-    invoiceModel,
-    itemModel,
-    variantModel,
-    userModel,
-
-    invoiceIdField,
-    itemIdField,
-    variantIdField,
-
-    invoiceItemsRelation,
-    itemVariantRelation,
-    invoiceSellerRelation,
-
-    invoicePublicIdField: pickField(invoiceModel, [
-      "invoiceId",
-      "code",
-      "serial",
-      "reference",
-      "publicId",
-    ]),
-    invoiceCustomerField: pickField(invoiceModel, [
-      "customerName",
-      "clientName",
-      "customer",
-      "client",
-      "buyerName",
-    ]),
-    invoiceTotalField: pickField(invoiceModel, [
-      "total",
-      "netTotal",
-      "finalTotal",
-      "grandTotal",
-    ]),
-    invoiceDiscountField: pickField(invoiceModel, [
-      "discount",
-      "discountAmount",
-    ]),
-    invoiceDateField: pickField(invoiceModel, [
-      "createdAt",
-      "issuedAt",
-      "date",
-      "invoiceDate",
-    ]),
-    invoiceNotesField: pickField(invoiceModel, [
-      "notes",
-      "note",
-      "comment",
-    ]),
-
-    itemQtyField: pickField(itemModel, ["quantity", "qty", "count"]),
-    itemReturnedQtyField: pickField(itemModel, [
-      "returnedQty",
-      "returnQty",
-      "refundedQty",
-    ]),
-    itemUnitPriceField: pickField(itemModel, [
-      "sellPrice",
-      "price",
-      "unitPrice",
-      "salePrice",
-    ]),
-    itemVariantIdField: pickField(itemModel, [
-      "variantId",
-      "productVariantId",
-      "itemVariantId",
-      "inventoryItemId",
-    ]),
-
-    userNameField: pickField(userModel, ["username", "name", "fullName"]),
-
-    variantStockField: pickField(variantModel, [
-      "stockQty",
-      "qty",
-      "stock",
-      "quantity",
-    ]),
-    variantPriceField: pickField(variantModel, [
-      "sellPrice",
-      "salePrice",
-      "price",
-      "sellingPrice",
-    ]),
-    variantSkuField: pickField(variantModel, ["sku", "code", "barcode"]),
-    variantSizeField: pickField(variantModel, ["size", "sizeValue"]),
-    variantColorField: pickField(variantModel, ["color", "colour"]),
-    variantGradeField: pickField(variantModel, ["grade", "quality"]),
-    variantModelNameField: pickField(variantModel, [
-      "modelName",
-      "name",
-      "model",
-      "title",
-    ]),
-    variantBrandField: pickField(variantModel, ["brand", "brandName", "label"]),
-    variantActiveField: pickField(variantModel, [
-      "isActive",
-      "active",
-      "enabled",
-    ]),
-  };
-}
-
-async function getInvoiceData(query: string) {
-  const adapter = getAdapter();
-
-  if (!adapter.invoiceModel) {
-    return {
-      invoice: null as InvoiceView | null,
-      replacements: [] as ReplacementVariantView[],
-      recentInvoices: [] as MiniInvoiceCard[],
-    };
-  }
-
-  const include: Record<string, any> = {};
-  if (adapter.invoiceItemsRelation?.name) include[adapter.invoiceItemsRelation.name] = true;
-  if (adapter.invoiceSellerRelation?.name) include[adapter.invoiceSellerRelation.name] = true;
-
-  const orderField =
-    adapter.invoiceDateField?.name ??
-    adapter.invoiceIdField?.name ??
-    "id";
-
-  const invoices = await adapter.client[adapter.invoiceModel.delegate].findMany({
-    ...(Object.keys(include).length ? { include } : {}),
-    ...(orderField ? { orderBy: { [orderField]: "desc" } } : {}),
-    take: 100,
-  });
-
-  const recentInvoices: MiniInvoiceCard[] = (Array.isArray(invoices) ? invoices : []).slice(0, 8).map((invoice: any) => ({
-    dbId: String(getValue(invoice, [adapter.invoiceIdField?.name, "id"], "")),
-    publicId: String(
-      getValue(
-        invoice,
-        [adapter.invoicePublicIdField?.name, "invoiceId", "code", "serial"],
-        getValue(invoice, [adapter.invoiceIdField?.name, "id"], "-")
-      )
-    ),
-    customer: String(
-      getValue(
-        invoice,
-        [adapter.invoiceCustomerField?.name, "customerName", "clientName", "customer", "buyerName"],
-        "-"
-      )
-    ),
-    seller:
-      adapter.invoiceSellerRelation?.name && invoice[adapter.invoiceSellerRelation.name]
-        ? String(
-            getValue(
-              invoice[adapter.invoiceSellerRelation.name],
-              [adapter.userNameField?.name, "username", "name"],
-              "-"
-            )
-          )
-        : "-",
-    total: toNumber(
-      getValue(invoice, [adapter.invoiceTotalField?.name, "total", "finalTotal"], 0)
-    ),
-    dateText: (() => {
-      const d = getValue(invoice, [adapter.invoiceDateField?.name, "createdAt", "issuedAt", "date"], null);
-      return d ? new Date(d).toLocaleString("ar-EG") : "-";
-    })(),
-  }));
-
-  const found = (Array.isArray(invoices) ? invoices : []).find((invoice: any) => {
-    if (!query) return false;
-
-    const haystack = [
-      String(getValue(invoice, [adapter.invoiceIdField?.name, "id"], "")),
-      String(
-        getValue(
-          invoice,
-          [adapter.invoicePublicIdField?.name, "invoiceId", "code", "serial"],
-          ""
-        )
-      ),
-      String(
-        getValue(
-          invoice,
-          [adapter.invoiceCustomerField?.name, "customerName", "clientName", "customer", "buyerName"],
-          ""
-        )
-      ),
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    return haystack.includes(query.toLowerCase());
-  });
-
-  let invoice: InvoiceView | null = null;
-
-  if (found) {
-    const rawItems = adapter.invoiceItemsRelation?.name
-      ? Array.isArray(found[adapter.invoiceItemsRelation.name])
-        ? found[adapter.invoiceItemsRelation.name]
-        : []
-      : [];
-
-    const items: InvoiceItemView[] = rawItems.map((item: any) => {
-      const linkedVariant =
-        adapter.itemVariantRelation?.name && item[adapter.itemVariantRelation.name]
-          ? item[adapter.itemVariantRelation.name]
-          : null;
-
-      const soldQty = toNumber(
-        getValue(item, [adapter.itemQtyField?.name, "quantity", "qty"], 0)
-      );
-      const returnedQty = toNumber(
-        getValue(
-          item,
-          [adapter.itemReturnedQtyField?.name, "returnedQty", "returnQty", "refundedQty"],
-          0
-        )
-      );
-
-      const title = [
-        getValue(
-          linkedVariant,
-          [adapter.variantModelNameField?.name, "modelName", "name", "model"],
-          ""
-        ),
-        getValue(linkedVariant, [adapter.variantBrandField?.name, "brand", "brandName"], ""),
-        getValue(linkedVariant, [adapter.variantGradeField?.name, "grade"], ""),
-        getValue(linkedVariant, [adapter.variantSizeField?.name, "size"], ""),
-        getValue(linkedVariant, [adapter.variantColorField?.name, "color"], ""),
-        getValue(linkedVariant, [adapter.variantSkuField?.name, "sku", "code"], ""),
-      ]
-        .filter(Boolean)
-        .join(" - ");
-
-      const variantId =
-        getValue(
-          item,
-          [adapter.itemVariantIdField?.name, "variantId", "productVariantId"],
-          null
-        ) ??
-        (linkedVariant
-          ? String(getValue(linkedVariant, [adapter.variantIdField?.name, "id"], ""))
-          : null);
-
-      return {
-        id: String(getValue(item, [adapter.itemIdField?.name, "id"], "")),
-        soldQty,
-        returnedQty,
-        remainingQty: Math.max(0, soldQty - returnedQty),
-        unitPrice: toNumber(
-          getValue(
-            item,
-            [adapter.itemUnitPriceField?.name, "sellPrice", "price", "unitPrice"],
-            0
-          )
-        ),
-        title: title || `عنصر #${getValue(item, [adapter.itemIdField?.name, "id"], "-")}`,
-        variantId: variantId ? String(variantId) : null,
-      };
-    });
-
-    invoice = {
-      dbId: String(getValue(found, [adapter.invoiceIdField?.name, "id"], "")),
-      publicId: String(
-        getValue(
-          found,
-          [adapter.invoicePublicIdField?.name, "invoiceId", "code", "serial"],
-          getValue(found, [adapter.invoiceIdField?.name, "id"], "-")
-        )
-      ),
-      customer: String(
-        getValue(
-          found,
-          [adapter.invoiceCustomerField?.name, "customerName", "clientName", "customer", "buyerName"],
-          "-"
-        )
-      ),
-      seller:
-        adapter.invoiceSellerRelation?.name && found[adapter.invoiceSellerRelation.name]
-          ? String(
-              getValue(
-                found[adapter.invoiceSellerRelation.name],
-                [adapter.userNameField?.name, "username", "name"],
-                "-"
-              )
-            )
-          : "-",
-      total: toNumber(
-        getValue(found, [adapter.invoiceTotalField?.name, "total", "finalTotal"], 0)
-      ),
-      discount: toNumber(
-        getValue(found, [adapter.invoiceDiscountField?.name, "discount", "discountAmount"], 0)
-      ),
-      dateText: (() => {
-        const d = getValue(
-          found,
-          [adapter.invoiceDateField?.name, "createdAt", "issuedAt", "date"],
-          null
-        );
-        return d ? new Date(d).toLocaleString("ar-EG") : "-";
-      })(),
-      items,
-      rawHasItemsRelation: Boolean(adapter.invoiceItemsRelation?.name),
-    };
-  }
-
-  let replacements: ReplacementVariantView[] = [];
-
-  if (adapter.variantModel && adapter.variantIdField) {
-    const where: Record<string, any> = {};
-    if (adapter.variantActiveField) where[adapter.variantActiveField.name] = true;
-
-    const variants = await adapter.client[adapter.variantModel.delegate].findMany({
-      ...(Object.keys(where).length ? { where } : {}),
-      take: 200,
-      orderBy: {
-        [adapter.variantIdField.name]: "desc",
-      },
-    });
-
-    replacements = (Array.isArray(variants) ? variants : []).map((variant: any) => {
-      const stockQty = toNumber(
-        getValue(
-          variant,
-          [adapter.variantStockField?.name, "stockQty", "qty", "stock"],
-          0
-        )
-      );
-
-      const sellPrice = toNumber(
-        getValue(
-          variant,
-          [adapter.variantPriceField?.name, "sellPrice", "salePrice", "price"],
-          0
-        )
-      );
-
-      return {
-        id: String(getValue(variant, [adapter.variantIdField?.name, "id"], "")),
-        label: [
-          getValue(
-            variant,
-            [adapter.variantModelNameField?.name, "modelName", "name", "model"],
-            ""
-          ),
-          getValue(variant, [adapter.variantBrandField?.name, "brand", "brandName"], ""),
-          getValue(variant, [adapter.variantGradeField?.name, "grade"], ""),
-          getValue(variant, [adapter.variantSizeField?.name, "size"], ""),
-          getValue(variant, [adapter.variantColorField?.name, "color"], ""),
-          `مخزون ${stockQty}`,
-        ]
-          .filter(Boolean)
-          .join(" - "),
-        stockQty,
-        sellPrice,
-      };
-    });
-  }
-
-  return { invoice, replacements, recentInvoices };
-}
-
 async function processReturnAction(formData: FormData) {
   "use server";
 
-  await ensureLoggedIn();
-
-  const adapter = getAdapter();
-
-  if (
-    !adapter.invoiceModel ||
-    !adapter.itemModel ||
-    !adapter.invoiceIdField ||
-    !adapter.invoiceItemsRelation
-  ) {
-    redirect("/returns?result=config_error");
+  const user = await getCurrentUser();
+  if (!user?.id) {
+    redirect("/login");
   }
 
-  const invoiceDbId = String(formData.get("invoiceDbId") ?? "").trim();
+  const saleId = String(formData.get("saleId") ?? "").trim();
   const searchQ = String(formData.get("searchQ") ?? "").trim();
-  const mode = String(formData.get("mode") ?? "refund").trim();
+  const mode = String(formData.get("mode") ?? "REFUND").trim().toUpperCase();
   const note = String(formData.get("note") ?? "").trim();
 
-  if (!invoiceDbId) {
-    redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=notfound`);
+  if (!saleId) {
+    redirect(`/returns?result=notfound&q=${encodeURIComponent(searchQ)}`);
   }
 
-  const include: Record<string, any> = {
-    [adapter.invoiceItemsRelation.name]: true,
-  };
-
-  const invoice = await adapter.client[adapter.invoiceModel.delegate].findUnique({
-    where: {
-      [adapter.invoiceIdField.name]: coerceByField(invoiceDbId, adapter.invoiceIdField),
+  const sale = await prisma.sale.findUnique({
+    where: { id: saleId },
+    include: {
+      items: {
+        include: {
+          variant: {
+            include: {
+              model: true,
+            },
+          },
+          returnItems: true,
+        },
+      },
+      seller: true,
+      returns: {
+        include: {
+          items: true,
+          replacements: true,
+        },
+      },
     },
-    include,
   });
 
-  if (!invoice) {
-    redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=notfound`);
+  if (!sale) {
+    redirect(`/returns?result=notfound&q=${encodeURIComponent(searchQ)}`);
   }
 
-  const rawItems = Array.isArray(invoice[adapter.invoiceItemsRelation.name])
-    ? invoice[adapter.invoiceItemsRelation.name]
-    : [];
+  let returnedGross = 0;
+  let replacementValue = 0;
+  let hasAnyRow = false;
 
-  let refundAmount = 0;
-  let extraAmount = 0;
-  let processedRows = 0;
+  const selectedRows: Array<{
+    saleItemId: string;
+    variantId: string;
+    qty: number;
+    unitPrice: number;
+    lineTotal: number;
+  }> = [];
 
-  for (const item of rawItems) {
-    const itemId = String(getValue(item, [adapter.itemIdField?.name, "id"], ""));
-    if (!itemId) continue;
+  const replacementRows: Array<{
+    variantId: string;
+    qty: number;
+    unitPrice: number;
+    lineTotal: number;
+  }> = [];
 
-    const returnQty = Math.max(0, toNumber(formData.get(`returnQty_${itemId}`)));
+  for (const item of sale.items) {
+    const returnQty = Math.max(0, toNumber(formData.get(`returnQty_${item.id}`)));
     if (returnQty <= 0) continue;
 
-    const soldQty = toNumber(
-      getValue(item, [adapter.itemQtyField?.name, "quantity", "qty"], 0)
-    );
-    const returnedQty = toNumber(
-      getValue(
-        item,
-        [adapter.itemReturnedQtyField?.name, "returnedQty", "returnQty", "refundedQty"],
-        0
-      )
-    );
-    const remainingQty = Math.max(0, soldQty - returnedQty);
+    const alreadyReturned = item.returnItems.reduce((sum, row) => {
+      if (row.saleItemId === item.id) return sum + row.qty;
+      return sum;
+    }, 0);
+
+    const remainingQty = Math.max(0, item.qty - alreadyReturned);
 
     if (returnQty > remainingQty) {
-      redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=qty_error`);
+      redirect(`/returns?result=qty_error&q=${encodeURIComponent(searchQ)}`);
     }
 
-    const unitPrice = toNumber(
-      getValue(
-        item,
-        [adapter.itemUnitPriceField?.name, "sellPrice", "price", "unitPrice"],
-        0
-      )
-    );
+    hasAnyRow = true;
 
-    const originalVariantId = getValue(
-      item,
-      [adapter.itemVariantIdField?.name, "variantId", "productVariantId"],
-      null
-    );
+    const lineTotal = returnQty * item.sellPrice;
+    returnedGross += lineTotal;
 
-    if (
-      adapter.variantModel &&
-      adapter.variantIdField &&
-      adapter.variantStockField &&
-      originalVariantId !== null
-    ) {
-      await adapter.client[adapter.variantModel.delegate].update({
-        where: {
-          [adapter.variantIdField.name]: coerceByField(originalVariantId, adapter.variantIdField),
-        },
-        data: {
-          [adapter.variantStockField.name]: {
-            increment: returnQty,
-          },
-        },
-      });
-    }
+    selectedRows.push({
+      saleItemId: item.id,
+      variantId: item.variantId,
+      qty: returnQty,
+      unitPrice: item.sellPrice,
+      lineTotal,
+    });
 
-    if (mode === "exchange") {
-      const replacementId = String(formData.get(`replacement_${itemId}`) ?? "").trim();
+    if (mode === "EXCHANGE") {
+      const replacementVariantId = String(formData.get(`replacement_${item.id}`) ?? "").trim();
 
-      if (!replacementId) {
-        redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=replacement_required`);
+      if (!replacementVariantId) {
+        redirect(`/returns?result=replacement_required&q=${encodeURIComponent(searchQ)}`);
       }
 
-      if (
-        !adapter.variantModel ||
-        !adapter.variantIdField ||
-        !adapter.variantStockField
-      ) {
-        redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=config_error`);
-      }
-
-      const replacement = await adapter.client[adapter.variantModel.delegate].findUnique({
-        where: {
-          [adapter.variantIdField.name]: coerceByField(replacementId, adapter.variantIdField),
-        },
+      const replacement = await prisma.productVariant.findUnique({
+        where: { id: replacementVariantId },
+        include: { model: true },
       });
 
       if (!replacement) {
-        redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=replacement_notfound`);
+        redirect(`/returns?result=replacement_notfound&q=${encodeURIComponent(searchQ)}`);
       }
 
-      const replacementStock = toNumber(
-        getValue(
-          replacement,
-          [adapter.variantStockField.name, "stockQty", "qty", "stock"],
-          0
-        )
-      );
-
-      if (replacementStock < returnQty) {
-        redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=stock_error`);
+      if (!replacement.isActive) {
+        redirect(`/returns?result=replacement_inactive&q=${encodeURIComponent(searchQ)}`);
       }
 
-      await adapter.client[adapter.variantModel.delegate].update({
-        where: {
-          [adapter.variantIdField.name]: coerceByField(replacementId, adapter.variantIdField),
-        },
-        data: {
-          [adapter.variantStockField.name]: {
-            decrement: returnQty,
-          },
-        },
-      });
-
-      const replacementPrice = toNumber(
-        getValue(
-          replacement,
-          [adapter.variantPriceField?.name, "sellPrice", "salePrice", "price"],
-          unitPrice
-        )
-      );
-
-      const thisRefund = unitPrice * returnQty;
-      const thisReplacement = replacementPrice * returnQty;
-
-      if (thisRefund >= thisReplacement) {
-        refundAmount += thisRefund - thisReplacement;
-      } else {
-        extraAmount += thisReplacement - thisRefund;
+      if (replacement.stockQty < returnQty) {
+        redirect(`/returns?result=stock_error&q=${encodeURIComponent(searchQ)}`);
       }
-    } else {
-      refundAmount += unitPrice * returnQty;
-    }
 
-    if (adapter.itemReturnedQtyField && adapter.itemIdField) {
-      await adapter.client[adapter.itemModel.delegate].update({
-        where: {
-          [adapter.itemIdField.name]: coerceByField(itemId, adapter.itemIdField),
-        },
-        data: {
-          [adapter.itemReturnedQtyField.name]: {
-            increment: returnQty,
-          },
-        },
+      const replacementLineTotal = replacement.sellPrice * returnQty;
+      replacementValue += replacementLineTotal;
+
+      replacementRows.push({
+        variantId: replacement.id,
+        qty: returnQty,
+        unitPrice: replacement.sellPrice,
+        lineTotal: replacementLineTotal,
       });
     }
-
-    processedRows += 1;
   }
 
-  if (processedRows === 0) {
-    redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=empty`);
+  if (!hasAnyRow) {
+    redirect(`/returns?result=empty&q=${encodeURIComponent(searchQ)}`);
   }
 
-  if (adapter.invoiceNotesField) {
-    const oldNotes = String(
-      getValue(invoice, [adapter.invoiceNotesField.name], "") ?? ""
-    );
+  const discountRatio = sale.total > 0 ? sale.discount / sale.total : 0;
+  const returnedDiscountShare = Math.round(returnedGross * discountRatio);
+  const returnedValue = Math.max(0, returnedGross - returnedDiscountShare);
 
-    const log = [
-      `[مرتجع ${mode === "exchange" ? "استبدال" : "استرداد"}]`,
-      `عدد العناصر: ${processedRows}`,
-      `المبلغ المسترد: ${refundAmount}`,
-      `المبلغ الإضافي: ${extraAmount}`,
-      note ? `ملاحظة: ${note}` : "",
-    ]
-      .filter(Boolean)
-      .join(" | ");
+  const refundAmount =
+    mode === "REFUND"
+      ? returnedValue
+      : Math.max(0, returnedValue - replacementValue);
 
-    await adapter.client[adapter.invoiceModel.delegate].update({
-      where: {
-        [adapter.invoiceIdField.name]: coerceByField(invoiceDbId, adapter.invoiceIdField),
-      },
+  const extraAmount =
+    mode === "EXCHANGE"
+      ? Math.max(0, replacementValue - returnedValue)
+      : 0;
+
+  await prisma.$transaction(async (tx) => {
+    const createdReturn = await tx.saleReturn.create({
       data: {
-        [adapter.invoiceNotesField.name]: [oldNotes, log].filter(Boolean).join("\n"),
+        saleId: sale.id,
+        createdById: user.id,
+        type:
+          mode === "EXCHANGE"
+            ? PrismaReturnType.EXCHANGE
+            : PrismaReturnType.REFUND,
+        notes: note || null,
+        returnedGross,
+        returnedDiscountShare,
+        returnedValue,
+        replacementValue,
+        refundAmount,
+        extraAmount,
       },
     });
-  }
+
+    for (const row of selectedRows) {
+      await tx.saleReturnItem.create({
+        data: {
+          returnId: createdReturn.id,
+          saleItemId: row.saleItemId,
+          variantId: row.variantId,
+          qty: row.qty,
+          unitPrice: row.unitPrice,
+          lineTotal: row.lineTotal,
+        },
+      });
+
+      await tx.productVariant.update({
+        where: { id: row.variantId },
+        data: {
+          stockQty: {
+            increment: row.qty,
+          },
+        },
+      });
+    }
+
+    for (const row of replacementRows) {
+      await tx.saleReturnReplacement.create({
+        data: {
+          returnId: createdReturn.id,
+          variantId: row.variantId,
+          qty: row.qty,
+          unitPrice: row.unitPrice,
+          lineTotal: row.lineTotal,
+        },
+      });
+
+      await tx.productVariant.update({
+        where: { id: row.variantId },
+        data: {
+          stockQty: {
+            decrement: row.qty,
+          },
+        },
+      });
+    }
+  });
 
   revalidatePath("/returns");
   revalidatePath("/products");
+  revalidatePath("/dashboard");
   revalidatePath("/invoices");
 
   redirect(
@@ -821,7 +286,66 @@ export default async function ReturnsPage({
   const refund = toNumber(params?.refund);
   const extra = toNumber(params?.extra);
 
-  const { invoice, replacements, recentInvoices } = await getInvoiceData(q);
+  const recentSales = await prisma.sale.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    include: {
+      seller: true,
+      items: {
+        include: {
+          variant: {
+            include: {
+              model: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  let foundSale:
+    | (Awaited<ReturnType<typeof prisma.sale.findFirst>> & {
+        seller: any;
+        items: any[];
+      })
+    | null = null;
+
+  if (q) {
+    foundSale = await prisma.sale.findFirst({
+      where: {
+        OR: [
+          { id: { contains: q, mode: "insensitive" } },
+          { customer: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      include: {
+        seller: true,
+        items: {
+          include: {
+            variant: {
+              include: {
+                model: true,
+                returnItems: true,
+              },
+            },
+            returnItems: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  const replacementVariants = await prisma.productVariant.findMany({
+    where: {
+      isActive: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: {
+      model: true,
+    },
+  });
 
   return (
     <main dir="rtl" className="min-h-screen bg-black text-white">
@@ -838,7 +362,7 @@ export default async function ReturnsPage({
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold tracking-tight">المرتجعات والاستبدال</h1>
           <p className="mt-2 text-sm text-white/60">
-            بحث بالفاتورة، التحقق من الكميات، ثم تنفيذ استرداد أو استبدال بشكل منظم وواضح.
+            بحث بالفاتورة أو العميل، ثم تنفيذ الاسترداد أو الاستبدال بشكل صحيح ومربوط بالمخزون.
           </p>
         </div>
 
@@ -857,8 +381,8 @@ export default async function ReturnsPage({
           "stock_error",
           "replacement_required",
           "replacement_notfound",
+          "replacement_inactive",
           "empty",
-          "config_error",
           "notfound",
         ].includes(result) ? (
           <div className="mb-6 rounded-3xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-200">
@@ -866,9 +390,9 @@ export default async function ReturnsPage({
             {result === "stock_error" && "المخزون غير كافٍ في المنتج البديل."}
             {result === "replacement_required" && "يجب اختيار منتج بديل لكل عنصر في وضع الاستبدال."}
             {result === "replacement_notfound" && "المنتج البديل المحدد غير موجود."}
+            {result === "replacement_inactive" && "المنتج البديل غير نشط."}
             {result === "empty" && "لم يتم تحديد أي كمية مرتجع."}
-            {result === "config_error" && "تعذر تحميل عناصر الفاتورة بالشكل المطلوب من قاعدة البيانات الحالية."}
-            {result === "notfound" && "الفاتورة غير موجودة."}
+            {result === "notfound" && "الفاتورة أو العميل غير موجود."}
           </div>
         ) : null}
 
@@ -876,12 +400,12 @@ export default async function ReturnsPage({
           <form method="GET" className="grid gap-4 lg:grid-cols-[1fr_auto]">
             <div>
               <label className="mb-2 block text-sm text-white/65">
-                ابحث برقم الفاتورة أو الكود أو اسم العميل
+                ابحث برقم البيع أو اسم العميل
               </label>
               <input
                 name="q"
                 defaultValue={q}
-                placeholder="مثال: INV-102 أو 102"
+                placeholder="مثال: haytham أو cmnha8..."
                 className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
               />
             </div>
@@ -897,28 +421,30 @@ export default async function ReturnsPage({
             <div className="mb-4">
               <h2 className="text-xl font-extrabold">آخر الفواتير</h2>
               <p className="mt-1 text-sm text-white/55">
-                للوصول السريع إلى أحدث الفواتير قبل تنفيذ المرتجع أو الاستبدال.
+                للوصول السريع إلى أحدث المبيعات قبل تنفيذ المرتجع أو الاستبدال.
               </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {recentInvoices.length === 0 ? (
+              {recentSales.length === 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-5 text-sm text-white/45">
-                  لا توجد فواتير بعد.
+                  لا توجد مبيعات بعد.
                 </div>
               ) : (
-                recentInvoices.map((inv) => (
+                recentSales.map((sale) => (
                   <Link
-                    key={inv.dbId}
-                    href={`/returns?q=${encodeURIComponent(inv.publicId)}`}
+                    key={sale.id}
+                    href={`/returns?q=${encodeURIComponent(sale.id)}`}
                     className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
                   >
                     <div className="text-sm text-white/55">رقم الفاتورة</div>
-                    <div className="mt-1 text-lg font-extrabold">{inv.publicId}</div>
-                    <div className="mt-3 text-sm text-white/70">العميل: {inv.customer}</div>
-                    <div className="mt-1 text-sm text-white/70">البائع: {inv.seller}</div>
-                    <div className="mt-3 text-sm font-bold">{formatEGP(inv.total)}</div>
-                    <div className="mt-2 text-xs text-white/45">{inv.dateText}</div>
+                    <div className="mt-1 break-all text-lg font-extrabold">{sale.id}</div>
+                    <div className="mt-3 text-sm text-white/70">العميل: {sale.customer || "بدون اسم"}</div>
+                    <div className="mt-1 text-sm text-white/70">البائع: {sale.seller?.username || "-"}</div>
+                    <div className="mt-3 text-sm font-bold">{formatEGP(sale.total)}</div>
+                    <div className="mt-2 text-xs text-white/45">
+                      {new Date(sale.createdAt).toLocaleString("ar-EG")}
+                    </div>
                   </Link>
                 ))
               )}
@@ -926,121 +452,129 @@ export default async function ReturnsPage({
           </section>
         ) : null}
 
-        {invoice ? (
+        {foundSale ? (
           <>
             <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="text-sm text-white/60">رقم الفاتورة</div>
-                <div className="mt-2 break-all text-xl font-black">{invoice.publicId}</div>
+                <div className="mt-2 break-all text-xl font-black">{foundSale.id}</div>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="text-sm text-white/60">العميل</div>
-                <div className="mt-2 text-lg font-bold">{invoice.customer}</div>
+                <div className="mt-2 text-lg font-bold">{foundSale.customer || "بدون اسم"}</div>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="text-sm text-white/60">البائع</div>
-                <div className="mt-2 text-lg font-bold">{invoice.seller}</div>
+                <div className="mt-2 text-lg font-bold">{foundSale.seller?.username || "-"}</div>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="text-sm text-white/60">إجمالي الفاتورة</div>
-                <div className="mt-2 text-2xl font-black">{formatEGP(invoice.total)}</div>
+                <div className="mt-2 text-2xl font-black">{formatEGP(foundSale.total)}</div>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="text-sm text-white/60">الخصم / التاريخ</div>
                 <div className="mt-2 text-sm font-bold text-white/85">
-                  {formatEGP(invoice.discount)}
-                  <div className="mt-1 text-white/55">{invoice.dateText}</div>
+                  {formatEGP(foundSale.discount)}
+                  <div className="mt-1 text-white/55">
+                    {new Date(foundSale.createdAt).toLocaleString("ar-EG")}
+                  </div>
                 </div>
               </div>
             </section>
 
-            {!invoice.rawHasItemsRelation ? (
-              <section className="rounded-[28px] border border-yellow-500/30 bg-yellow-500/10 p-6">
-                <h2 className="text-lg font-extrabold text-yellow-300">تم العثور على الفاتورة لكن عناصرها غير محملة</h2>
-                <p className="mt-2 text-sm text-yellow-100/85">
-                  هذا معناه أن ربط عناصر الفاتورة في قاعدة البيانات مختلف عن التوقع داخل الصفحة الحالية.
-                  الصفحة تحتاج Patch صغير مخصص حسب relation الفعلي لعناصر البيع داخل Prisma schema.
+            <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+              <div className="mb-5">
+                <h2 className="text-xl font-extrabold">تنفيذ مرتجع أو استبدال</h2>
+                <p className="mt-1 text-sm text-white/55">
+                  حدّد الكميات بدقة. النظام يتحقق من المتبقي ويحدّث المخزون ويسجل العملية.
                 </p>
-              </section>
-            ) : (
-              <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-                <div className="mb-5">
-                  <h2 className="text-xl font-extrabold">تنفيذ مرتجع أو استبدال</h2>
-                  <p className="mt-1 text-sm text-white/55">
-                    حدّد الكميات بدقة. النظام يتحقق من المتبقي ويحسب المسترد أو الفرق الإضافي.
-                  </p>
+              </div>
+
+              <form action={processReturnAction} className="space-y-6">
+                <input type="hidden" name="saleId" value={foundSale.id} />
+                <input type="hidden" name="searchQ" value={q} />
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                    <span className="mb-2 block text-sm text-white/65">نوع العملية</span>
+                    <select
+                      name="mode"
+                      defaultValue="REFUND"
+                      className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none focus:border-red-500/60"
+                    >
+                      <option value="REFUND" className="bg-black">
+                        استرداد
+                      </option>
+                      <option value="EXCHANGE" className="bg-black">
+                        استبدال
+                      </option>
+                    </select>
+                  </label>
+
+                  <label className="rounded-2xl border border-white/10 bg-black/40 p-4 lg:col-span-2">
+                    <span className="mb-2 block text-sm text-white/65">ملاحظة داخلية</span>
+                    <textarea
+                      name="note"
+                      rows={2}
+                      placeholder="سبب المرتجع أو ملاحظة تشغيلية"
+                      className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 outline-none placeholder:text-white/35 focus:border-red-500/60"
+                    />
+                  </label>
                 </div>
 
-                <form action={processReturnAction} className="space-y-6">
-                  <input type="hidden" name="invoiceDbId" value={invoice.dbId} />
-                  <input type="hidden" name="searchQ" value={q} />
+                <div className="overflow-x-auto rounded-3xl border border-white/10">
+                  <table className="min-w-[1250px] w-full text-right">
+                    <thead className="bg-white/[0.03] text-sm text-white/70">
+                      <tr>
+                        <th className="px-4 py-4">العنصر</th>
+                        <th className="px-4 py-4">سعر الوحدة</th>
+                        <th className="px-4 py-4">المباع</th>
+                        <th className="px-4 py-4">مرتجع سابق</th>
+                        <th className="px-4 py-4">المتبقي</th>
+                        <th className="px-4 py-4">كمية المرتجع</th>
+                        <th className="px-4 py-4">المنتج البديل</th>
+                      </tr>
+                    </thead>
 
-                  <div className="grid gap-4 lg:grid-cols-3">
-                    <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                      <span className="mb-2 block text-sm text-white/65">نوع العملية</span>
-                      <select
-                        name="mode"
-                        defaultValue="refund"
-                        className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none focus:border-red-500/60"
-                      >
-                        <option value="refund" className="bg-black">
-                          استرداد
-                        </option>
-                        <option value="exchange" className="bg-black">
-                          استبدال
-                        </option>
-                      </select>
-                    </label>
-
-                    <label className="rounded-2xl border border-white/10 bg-black/40 p-4 lg:col-span-2">
-                      <span className="mb-2 block text-sm text-white/65">ملاحظة داخلية</span>
-                      <textarea
-                        name="note"
-                        rows={2}
-                        placeholder="سبب المرتجع أو ملحوظة تشغيلية"
-                        className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 outline-none placeholder:text-white/35 focus:border-red-500/60"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-3xl border border-white/10">
-                    <table className="min-w-[1200px] w-full text-right">
-                      <thead className="bg-white/[0.03] text-sm text-white/70">
+                    <tbody>
+                      {foundSale.items.length === 0 ? (
                         <tr>
-                          <th className="px-4 py-4">العنصر</th>
-                          <th className="px-4 py-4">سعر الوحدة</th>
-                          <th className="px-4 py-4">المباع</th>
-                          <th className="px-4 py-4">مرتجع سابق</th>
-                          <th className="px-4 py-4">المتبقي</th>
-                          <th className="px-4 py-4">كمية المرتجع</th>
-                          <th className="px-4 py-4">المنتج البديل</th>
+                          <td colSpan={7} className="px-4 py-16 text-center text-sm text-white/45">
+                            لا توجد عناصر داخل هذه الفاتورة.
+                          </td>
                         </tr>
-                      </thead>
+                      ) : (
+                        foundSale.items.map((item) => {
+                          const alreadyReturned = item.returnItems.reduce((sum, row) => sum + row.qty, 0);
+                          const remainingQty = Math.max(0, item.qty - alreadyReturned);
 
-                      <tbody>
-                        {invoice.items.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="px-4 py-16 text-center text-sm text-white/45">
-                              لا توجد عناصر داخل هذه الفاتورة.
-                            </td>
-                          </tr>
-                        ) : (
-                          invoice.items.map((item) => (
+                          const title = [
+                            item.variant.model?.name || "",
+                            item.variant.model?.brand || "",
+                            item.variant.grade || "",
+                            item.variant.size || "",
+                            item.variant.color || "",
+                            item.variant.sku || "",
+                          ]
+                            .filter(Boolean)
+                            .join(" - ");
+
+                          return (
                             <tr key={item.id} className="border-t border-white/10 align-top">
                               <td className="px-4 py-4">
-                                <div className="font-bold">{item.title}</div>
+                                <div className="font-bold">{title || "عنصر"}</div>
                               </td>
 
-                              <td className="px-4 py-4">{formatEGP(item.unitPrice)}</td>
-                              <td className="px-4 py-4 font-bold">{item.soldQty}</td>
-                              <td className="px-4 py-4 text-white/65">{item.returnedQty}</td>
+                              <td className="px-4 py-4">{formatEGP(item.sellPrice)}</td>
+                              <td className="px-4 py-4 font-bold">{item.qty}</td>
+                              <td className="px-4 py-4 text-white/65">{alreadyReturned}</td>
                               <td className="px-4 py-4">
                                 <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
-                                  {item.remainingQty}
+                                  {remainingQty}
                                 </span>
                               </td>
 
@@ -1049,7 +583,7 @@ export default async function ReturnsPage({
                                   name={`returnQty_${item.id}`}
                                   type="number"
                                   min="0"
-                                  max={item.remainingQty}
+                                  max={remainingQty}
                                   defaultValue={0}
                                   className="h-11 w-28 rounded-xl border border-white/10 bg-black/40 px-3 outline-none focus:border-red-500/60"
                                 />
@@ -1059,39 +593,48 @@ export default async function ReturnsPage({
                                 <select
                                   name={`replacement_${item.id}`}
                                   defaultValue=""
-                                  className="h-11 min-w-[340px] rounded-xl border border-white/10 bg-black/40 px-3 outline-none focus:border-red-500/60"
+                                  className="h-11 min-w-[360px] rounded-xl border border-white/10 bg-black/40 px-3 outline-none focus:border-red-500/60"
                                 >
                                   <option value="" className="bg-black">
                                     اختر بديلًا عند الاستبدال
                                   </option>
 
-                                  {replacements.map((variant) => (
+                                  {replacementVariants.map((variant) => (
                                     <option key={variant.id} value={variant.id} className="bg-black">
-                                      {variant.label}
+                                      {[
+                                        variant.model.name,
+                                        variant.model.brand || "",
+                                        variant.grade,
+                                        variant.size || "",
+                                        variant.color || "",
+                                        `مخزون ${variant.stockQty}`,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" - ")}
                                     </option>
                                   ))}
                                 </select>
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
 
-                  <div className="flex justify-end">
-                    <button className="h-12 rounded-2xl bg-red-600 px-8 text-sm font-extrabold transition hover:bg-red-500">
-                      تنفيذ العملية
-                    </button>
-                  </div>
-                </form>
-              </section>
-            )}
+                <div className="flex justify-end">
+                  <button className="h-12 rounded-2xl bg-red-600 px-8 text-sm font-extrabold transition hover:bg-red-500">
+                    تنفيذ العملية
+                  </button>
+                </div>
+              </form>
+            </section>
           </>
         ) : q ? (
           <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-10 text-center">
             <div className="text-lg font-extrabold">لا توجد فاتورة مطابقة</div>
-            <p className="mt-2 text-sm text-white/55">جرّب رقم أو كود مختلف.</p>
+            <p className="mt-2 text-sm text-white/55">جرّب رقم بيع أو اسم عميل مختلف.</p>
           </section>
         ) : null}
       </div>
