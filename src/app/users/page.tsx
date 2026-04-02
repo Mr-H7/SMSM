@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import * as rbac from "@/lib/rbac";
 import { hashPassword } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -288,6 +289,15 @@ export default async function UsersPage() {
   return (
     <main dir="rtl" className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <Link
+            href="/dashboard"
+            className="inline-flex h-11 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold text-white transition hover:bg-white/10"
+          >
+            رجوع
+          </Link>
+        </div>
+
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold tracking-tight">إدارة المستخدمين</h1>
           <p className="mt-2 text-sm text-white/60">
@@ -323,7 +333,7 @@ export default async function UsersPage() {
           <div className="mb-5">
             <h2 className="text-xl font-extrabold">إنشاء بائع جديد</h2>
             <p className="mt-1 text-sm text-white/55">
-              يتم إنشاء الحساب كـ بائع فقط، مع تخزين كلمة المرور بالهاش الموجود في النظام.
+              يتم إنشاء الحساب كبائع فقط، مع تخزين كلمة المرور بالهاش الموجود في النظام.
             </p>
           </div>
 

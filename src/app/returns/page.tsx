@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import * as rbac from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,7 @@ type InvoiceView = {
   discount: number;
   dateText: string;
   items: InvoiceItemView[];
+  rawHasItemsRelation: boolean;
 };
 
 type ReplacementVariantView = {
@@ -48,6 +50,15 @@ type ReplacementVariantView = {
   label: string;
   stockQty: number;
   sellPrice: number;
+};
+
+type MiniInvoiceCard = {
+  dbId: string;
+  publicId: string;
+  customer: string;
+  seller: string;
+  total: number;
+  dateText: string;
 };
 
 function normalize(value: string) {
@@ -238,6 +249,7 @@ function getAdapter() {
       "clientName",
       "customer",
       "client",
+      "buyerName",
     ]),
     invoiceTotalField: pickField(invoiceModel, [
       "total",
@@ -318,9 +330,9 @@ async function getInvoiceData(query: string) {
 
   if (!adapter.invoiceModel) {
     return {
-      adapter,
       invoice: null as InvoiceView | null,
       replacements: [] as ReplacementVariantView[],
+      recentInvoices: [] as MiniInvoiceCard[],
     };
   }
 
@@ -336,8 +348,43 @@ async function getInvoiceData(query: string) {
   const invoices = await adapter.client[adapter.invoiceModel.delegate].findMany({
     ...(Object.keys(include).length ? { include } : {}),
     ...(orderField ? { orderBy: { [orderField]: "desc" } } : {}),
-    take: 150,
+    take: 100,
   });
+
+  const recentInvoices: MiniInvoiceCard[] = (Array.isArray(invoices) ? invoices : []).slice(0, 8).map((invoice: any) => ({
+    dbId: String(getValue(invoice, [adapter.invoiceIdField?.name, "id"], "")),
+    publicId: String(
+      getValue(
+        invoice,
+        [adapter.invoicePublicIdField?.name, "invoiceId", "code", "serial"],
+        getValue(invoice, [adapter.invoiceIdField?.name, "id"], "-")
+      )
+    ),
+    customer: String(
+      getValue(
+        invoice,
+        [adapter.invoiceCustomerField?.name, "customerName", "clientName", "customer", "buyerName"],
+        "-"
+      )
+    ),
+    seller:
+      adapter.invoiceSellerRelation?.name && invoice[adapter.invoiceSellerRelation.name]
+        ? String(
+            getValue(
+              invoice[adapter.invoiceSellerRelation.name],
+              [adapter.userNameField?.name, "username", "name"],
+              "-"
+            )
+          )
+        : "-",
+    total: toNumber(
+      getValue(invoice, [adapter.invoiceTotalField?.name, "total", "finalTotal"], 0)
+    ),
+    dateText: (() => {
+      const d = getValue(invoice, [adapter.invoiceDateField?.name, "createdAt", "issuedAt", "date"], null);
+      return d ? new Date(d).toLocaleString("ar-EG") : "-";
+    })(),
+  }));
 
   const found = (Array.isArray(invoices) ? invoices : []).find((invoice: any) => {
     if (!query) return false;
@@ -354,7 +401,7 @@ async function getInvoiceData(query: string) {
       String(
         getValue(
           invoice,
-          [adapter.invoiceCustomerField?.name, "customerName", "clientName"],
+          [adapter.invoiceCustomerField?.name, "customerName", "clientName", "customer", "buyerName"],
           ""
         )
       ),
@@ -397,31 +444,11 @@ async function getInvoiceData(query: string) {
           [adapter.variantModelNameField?.name, "modelName", "name", "model"],
           ""
         ),
-        getValue(
-          linkedVariant,
-          [adapter.variantBrandField?.name, "brand", "brandName"],
-          ""
-        ),
-        getValue(
-          linkedVariant,
-          [adapter.variantGradeField?.name, "grade"],
-          ""
-        ),
-        getValue(
-          linkedVariant,
-          [adapter.variantSizeField?.name, "size"],
-          ""
-        ),
-        getValue(
-          linkedVariant,
-          [adapter.variantColorField?.name, "color"],
-          ""
-        ),
-        getValue(
-          linkedVariant,
-          [adapter.variantSkuField?.name, "sku", "code"],
-          ""
-        ),
+        getValue(linkedVariant, [adapter.variantBrandField?.name, "brand", "brandName"], ""),
+        getValue(linkedVariant, [adapter.variantGradeField?.name, "grade"], ""),
+        getValue(linkedVariant, [adapter.variantSizeField?.name, "size"], ""),
+        getValue(linkedVariant, [adapter.variantColorField?.name, "color"], ""),
+        getValue(linkedVariant, [adapter.variantSkuField?.name, "sku", "code"], ""),
       ]
         .filter(Boolean)
         .join(" - ");
@@ -465,7 +492,7 @@ async function getInvoiceData(query: string) {
       customer: String(
         getValue(
           found,
-          [adapter.invoiceCustomerField?.name, "customerName", "clientName", "customer"],
+          [adapter.invoiceCustomerField?.name, "customerName", "clientName", "customer", "buyerName"],
           "-"
         )
       ),
@@ -494,6 +521,7 @@ async function getInvoiceData(query: string) {
         return d ? new Date(d).toLocaleString("ar-EG") : "-";
       })(),
       items,
+      rawHasItemsRelation: Boolean(adapter.invoiceItemsRelation?.name),
     };
   }
 
@@ -536,11 +564,7 @@ async function getInvoiceData(query: string) {
             [adapter.variantModelNameField?.name, "modelName", "name", "model"],
             ""
           ),
-          getValue(
-            variant,
-            [adapter.variantBrandField?.name, "brand", "brandName"],
-            ""
-          ),
+          getValue(variant, [adapter.variantBrandField?.name, "brand", "brandName"], ""),
           getValue(variant, [adapter.variantGradeField?.name, "grade"], ""),
           getValue(variant, [adapter.variantSizeField?.name, "size"], ""),
           getValue(variant, [adapter.variantColorField?.name, "color"], ""),
@@ -554,7 +578,7 @@ async function getInvoiceData(query: string) {
     });
   }
 
-  return { adapter, invoice, replacements };
+  return { invoice, replacements, recentInvoices };
 }
 
 async function processReturnAction(formData: FormData) {
@@ -567,7 +591,8 @@ async function processReturnAction(formData: FormData) {
   if (
     !adapter.invoiceModel ||
     !adapter.itemModel ||
-    !adapter.invoiceIdField
+    !adapter.invoiceIdField ||
+    !adapter.invoiceItemsRelation
   ) {
     redirect("/returns?result=config_error");
   }
@@ -581,24 +606,23 @@ async function processReturnAction(formData: FormData) {
     redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=notfound`);
   }
 
-  const include: Record<string, any> = {};
-  if (adapter.invoiceItemsRelation?.name) include[adapter.invoiceItemsRelation.name] = true;
+  const include: Record<string, any> = {
+    [adapter.invoiceItemsRelation.name]: true,
+  };
 
   const invoice = await adapter.client[adapter.invoiceModel.delegate].findUnique({
     where: {
       [adapter.invoiceIdField.name]: coerceByField(invoiceDbId, adapter.invoiceIdField),
     },
-    ...(Object.keys(include).length ? { include } : {}),
+    include,
   });
 
   if (!invoice) {
     redirect(`/returns?q=${encodeURIComponent(searchQ)}&result=notfound`);
   }
 
-  const rawItems = adapter.invoiceItemsRelation?.name
-    ? Array.isArray(invoice[adapter.invoiceItemsRelation.name])
-      ? invoice[adapter.invoiceItemsRelation.name]
-      : []
+  const rawItems = Array.isArray(invoice[adapter.invoiceItemsRelation.name])
+    ? invoice[adapter.invoiceItemsRelation.name]
     : [];
 
   let refundAmount = 0;
@@ -797,11 +821,20 @@ export default async function ReturnsPage({
   const refund = toNumber(params?.refund);
   const extra = toNumber(params?.extra);
 
-  const { invoice, replacements } = await getInvoiceData(q);
+  const { invoice, replacements, recentInvoices } = await getInvoiceData(q);
 
   return (
     <main dir="rtl" className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <Link
+            href="/dashboard"
+            className="inline-flex h-11 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold text-white transition hover:bg-white/10"
+          >
+            رجوع
+          </Link>
+        </div>
+
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold tracking-tight">المرتجعات والاستبدال</h1>
           <p className="mt-2 text-sm text-white/60">
@@ -834,7 +867,7 @@ export default async function ReturnsPage({
             {result === "replacement_required" && "يجب اختيار منتج بديل لكل عنصر في وضع الاستبدال."}
             {result === "replacement_notfound" && "المنتج البديل المحدد غير موجود."}
             {result === "empty" && "لم يتم تحديد أي كمية مرتجع."}
-            {result === "config_error" && "صفحة المرتجعات تحتاج موديلات قاعدة بيانات مكتملة حتى تعمل بكامل الوظائف."}
+            {result === "config_error" && "تعذر تحميل عناصر الفاتورة بالشكل المطلوب من قاعدة البيانات الحالية."}
             {result === "notfound" && "الفاتورة غير موجودة."}
           </div>
         ) : null}
@@ -859,12 +892,46 @@ export default async function ReturnsPage({
           </form>
         </section>
 
+        {!q ? (
+          <section className="mb-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+            <div className="mb-4">
+              <h2 className="text-xl font-extrabold">آخر الفواتير</h2>
+              <p className="mt-1 text-sm text-white/55">
+                للوصول السريع إلى أحدث الفواتير قبل تنفيذ المرتجع أو الاستبدال.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {recentInvoices.length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-black/30 p-5 text-sm text-white/45">
+                  لا توجد فواتير بعد.
+                </div>
+              ) : (
+                recentInvoices.map((inv) => (
+                  <Link
+                    key={inv.dbId}
+                    href={`/returns?q=${encodeURIComponent(inv.publicId)}`}
+                    className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
+                  >
+                    <div className="text-sm text-white/55">رقم الفاتورة</div>
+                    <div className="mt-1 text-lg font-extrabold">{inv.publicId}</div>
+                    <div className="mt-3 text-sm text-white/70">العميل: {inv.customer}</div>
+                    <div className="mt-1 text-sm text-white/70">البائع: {inv.seller}</div>
+                    <div className="mt-3 text-sm font-bold">{formatEGP(inv.total)}</div>
+                    <div className="mt-2 text-xs text-white/45">{inv.dateText}</div>
+                  </Link>
+                ))
+              )}
+            </div>
+          </section>
+        ) : null}
+
         {invoice ? (
           <>
             <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="text-sm text-white/60">رقم الفاتورة</div>
-                <div className="mt-2 text-2xl font-black">{invoice.publicId}</div>
+                <div className="mt-2 break-all text-xl font-black">{invoice.publicId}</div>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
@@ -891,143 +958,142 @@ export default async function ReturnsPage({
               </div>
             </section>
 
-            <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-              <div className="mb-5">
-                <h2 className="text-xl font-extrabold">تنفيذ مرتجع أو استبدال</h2>
-                <p className="mt-1 text-sm text-white/55">
-                  حدّد الكميات بدقة. النظام يتحقق من المتبقي ويحسب المسترد أو الفرق الإضافي.
+            {!invoice.rawHasItemsRelation ? (
+              <section className="rounded-[28px] border border-yellow-500/30 bg-yellow-500/10 p-6">
+                <h2 className="text-lg font-extrabold text-yellow-300">تم العثور على الفاتورة لكن عناصرها غير محملة</h2>
+                <p className="mt-2 text-sm text-yellow-100/85">
+                  هذا معناه أن ربط عناصر الفاتورة في قاعدة البيانات مختلف عن التوقع داخل الصفحة الحالية.
+                  الصفحة تحتاج Patch صغير مخصص حسب relation الفعلي لعناصر البيع داخل Prisma schema.
                 </p>
-              </div>
-
-              <form action={processReturnAction} className="space-y-6">
-                <input type="hidden" name="invoiceDbId" value={invoice.dbId} />
-                <input type="hidden" name="searchQ" value={q} />
-
-                <div className="grid gap-4 lg:grid-cols-3">
-                  <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                    <span className="mb-2 block text-sm text-white/65">نوع العملية</span>
-                    <select
-                      name="mode"
-                      defaultValue="refund"
-                      className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none focus:border-red-500/60"
-                    >
-                      <option value="refund" className="bg-black">
-                        استرداد
-                      </option>
-                      <option value="exchange" className="bg-black">
-                        استبدال
-                      </option>
-                    </select>
-                  </label>
-
-                  <label className="rounded-2xl border border-white/10 bg-black/40 p-4 lg:col-span-2">
-                    <span className="mb-2 block text-sm text-white/65">ملاحظة داخلية</span>
-                    <textarea
-                      name="note"
-                      rows={2}
-                      placeholder="سبب المرتجع أو ملحوظة تشغيلية"
-                      className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 outline-none placeholder:text-white/35 focus:border-red-500/60"
-                    />
-                  </label>
+              </section>
+            ) : (
+              <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
+                <div className="mb-5">
+                  <h2 className="text-xl font-extrabold">تنفيذ مرتجع أو استبدال</h2>
+                  <p className="mt-1 text-sm text-white/55">
+                    حدّد الكميات بدقة. النظام يتحقق من المتبقي ويحسب المسترد أو الفرق الإضافي.
+                  </p>
                 </div>
 
-                <div className="overflow-x-auto rounded-3xl border border-white/10">
-                  <table className="min-w-[1200px] w-full text-right">
-                    <thead className="bg-white/[0.03] text-sm text-white/70">
-                      <tr>
-                        <th className="px-4 py-4">العنصر</th>
-                        <th className="px-4 py-4">سعر الوحدة</th>
-                        <th className="px-4 py-4">المباع</th>
-                        <th className="px-4 py-4">مرتجع سابق</th>
-                        <th className="px-4 py-4">المتبقي</th>
-                        <th className="px-4 py-4">كمية المرتجع</th>
-                        <th className="px-4 py-4">المنتج البديل</th>
-                      </tr>
-                    </thead>
+                <form action={processReturnAction} className="space-y-6">
+                  <input type="hidden" name="invoiceDbId" value={invoice.dbId} />
+                  <input type="hidden" name="searchQ" value={q} />
 
-                    <tbody>
-                      {invoice.items.length === 0 ? (
+                  <div className="grid gap-4 lg:grid-cols-3">
+                    <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                      <span className="mb-2 block text-sm text-white/65">نوع العملية</span>
+                      <select
+                        name="mode"
+                        defaultValue="refund"
+                        className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none focus:border-red-500/60"
+                      >
+                        <option value="refund" className="bg-black">
+                          استرداد
+                        </option>
+                        <option value="exchange" className="bg-black">
+                          استبدال
+                        </option>
+                      </select>
+                    </label>
+
+                    <label className="rounded-2xl border border-white/10 bg-black/40 p-4 lg:col-span-2">
+                      <span className="mb-2 block text-sm text-white/65">ملاحظة داخلية</span>
+                      <textarea
+                        name="note"
+                        rows={2}
+                        placeholder="سبب المرتجع أو ملحوظة تشغيلية"
+                        className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 outline-none placeholder:text-white/35 focus:border-red-500/60"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-3xl border border-white/10">
+                    <table className="min-w-[1200px] w-full text-right">
+                      <thead className="bg-white/[0.03] text-sm text-white/70">
                         <tr>
-                          <td colSpan={7} className="px-4 py-16 text-center text-sm text-white/45">
-                            لا توجد عناصر داخل هذه الفاتورة.
-                          </td>
+                          <th className="px-4 py-4">العنصر</th>
+                          <th className="px-4 py-4">سعر الوحدة</th>
+                          <th className="px-4 py-4">المباع</th>
+                          <th className="px-4 py-4">مرتجع سابق</th>
+                          <th className="px-4 py-4">المتبقي</th>
+                          <th className="px-4 py-4">كمية المرتجع</th>
+                          <th className="px-4 py-4">المنتج البديل</th>
                         </tr>
-                      ) : (
-                        invoice.items.map((item) => (
-                          <tr key={item.id} className="border-t border-white/10 align-top">
-                            <td className="px-4 py-4">
-                              <div className="font-bold">{item.title}</div>
-                            </td>
+                      </thead>
 
-                            <td className="px-4 py-4">{formatEGP(item.unitPrice)}</td>
-                            <td className="px-4 py-4 font-bold">{item.soldQty}</td>
-                            <td className="px-4 py-4 text-white/65">{item.returnedQty}</td>
-                            <td className="px-4 py-4">
-                              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
-                                {item.remainingQty}
-                              </span>
-                            </td>
-
-                            <td className="px-4 py-4">
-                              <input
-                                name={`returnQty_${item.id}`}
-                                type="number"
-                                min="0"
-                                max={item.remainingQty}
-                                defaultValue={0}
-                                className="h-11 w-28 rounded-xl border border-white/10 bg-black/40 px-3 outline-none focus:border-red-500/60"
-                              />
-                            </td>
-
-                            <td className="px-4 py-4">
-                              <select
-                                name={`replacement_${item.id}`}
-                                defaultValue=""
-                                className="h-11 min-w-[340px] rounded-xl border border-white/10 bg-black/40 px-3 outline-none focus:border-red-500/60"
-                              >
-                                <option value="" className="bg-black">
-                                  اختر بديلًا عند الاستبدال
-                                </option>
-
-                                {replacements.map((variant) => (
-                                  <option
-                                    key={variant.id}
-                                    value={variant.id}
-                                    className="bg-black"
-                                  >
-                                    {variant.label}
-                                  </option>
-                                ))}
-                              </select>
+                      <tbody>
+                        {invoice.items.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="px-4 py-16 text-center text-sm text-white/45">
+                              لا توجد عناصر داخل هذه الفاتورة.
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        ) : (
+                          invoice.items.map((item) => (
+                            <tr key={item.id} className="border-t border-white/10 align-top">
+                              <td className="px-4 py-4">
+                                <div className="font-bold">{item.title}</div>
+                              </td>
 
-                <div className="flex justify-end">
-                  <button className="h-12 rounded-2xl bg-red-600 px-8 text-sm font-extrabold transition hover:bg-red-500">
-                    تنفيذ العملية
-                  </button>
-                </div>
-              </form>
-            </section>
+                              <td className="px-4 py-4">{formatEGP(item.unitPrice)}</td>
+                              <td className="px-4 py-4 font-bold">{item.soldQty}</td>
+                              <td className="px-4 py-4 text-white/65">{item.returnedQty}</td>
+                              <td className="px-4 py-4">
+                                <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
+                                  {item.remainingQty}
+                                </span>
+                              </td>
+
+                              <td className="px-4 py-4">
+                                <input
+                                  name={`returnQty_${item.id}`}
+                                  type="number"
+                                  min="0"
+                                  max={item.remainingQty}
+                                  defaultValue={0}
+                                  className="h-11 w-28 rounded-xl border border-white/10 bg-black/40 px-3 outline-none focus:border-red-500/60"
+                                />
+                              </td>
+
+                              <td className="px-4 py-4">
+                                <select
+                                  name={`replacement_${item.id}`}
+                                  defaultValue=""
+                                  className="h-11 min-w-[340px] rounded-xl border border-white/10 bg-black/40 px-3 outline-none focus:border-red-500/60"
+                                >
+                                  <option value="" className="bg-black">
+                                    اختر بديلًا عند الاستبدال
+                                  </option>
+
+                                  {replacements.map((variant) => (
+                                    <option key={variant.id} value={variant.id} className="bg-black">
+                                      {variant.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button className="h-12 rounded-2xl bg-red-600 px-8 text-sm font-extrabold transition hover:bg-red-500">
+                      تنفيذ العملية
+                    </button>
+                  </div>
+                </form>
+              </section>
+            )}
           </>
         ) : q ? (
           <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-10 text-center">
             <div className="text-lg font-extrabold">لا توجد فاتورة مطابقة</div>
             <p className="mt-2 text-sm text-white/55">جرّب رقم أو كود مختلف.</p>
           </section>
-        ) : (
-          <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-10 text-center">
-            <div className="text-lg font-extrabold">ابدأ بالبحث عن فاتورة</div>
-            <p className="mt-2 text-sm text-white/55">
-              بعد العثور على الفاتورة ستظهر العناصر والكميات المتبقية وخيارات الاسترداد والاستبدال.
-            </p>
-          </section>
-        )}
+        ) : null}
       </div>
     </main>
   );

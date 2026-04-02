@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import * as rbac from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,6 @@ function toNumber(value: unknown, fallback = 0) {
 
 function getRuntimeModels(client: any): Record<string, any> {
   if (client?._runtimeDataModel?.models) return client._runtimeDataModel.models;
-
   if (client?._baseDmmf?.modelMap) return client._baseDmmf.modelMap;
 
   const datamodel = client?._dmmf?.datamodel?.models;
@@ -145,10 +145,6 @@ function relationField(info: ModelInfo | null, targetModelName: string | null) {
       );
     }) ?? null
   );
-}
-
-function guessFieldName(info: ModelInfo | null, candidates: string[]) {
-  return pickField(info, candidates)?.name ?? candidates[0];
 }
 
 function getValue(obj: any, keys: Array<string | undefined | null>, fallback: any = "") {
@@ -493,54 +489,6 @@ async function deleteVariantAction(formData: FormData) {
   revalidatePath("/products");
 }
 
-async function deleteModelAction(formData: FormData) {
-  "use server";
-
-  await assertOwner();
-
-  const adapter = getInventoryAdapter();
-  if (!adapter.variantInfo) return;
-
-  const rawProductId = formData.get("productId");
-  const modelName = String(formData.get("modelName") ?? "").trim();
-  const brand = String(formData.get("brand") ?? "").trim();
-
-  if (adapter.productInfo && adapter.productIdField && rawProductId !== null) {
-    const productId = coerceWithField(rawProductId, adapter.productIdField);
-
-    if (adapter.productFkField) {
-      await adapter.client[adapter.variantInfo.delegate].deleteMany({
-        where: {
-          [adapter.productFkField.name]: productId,
-        },
-      });
-    }
-
-    try {
-      await adapter.client[adapter.productInfo.delegate].delete({
-        where: {
-          [adapter.productIdField.name]: productId,
-        },
-      });
-    } catch {
-      // تجاهل في حال كان الحذف قد تم عبر cascade
-    }
-
-    revalidatePath("/products");
-    return;
-  }
-
-  const where: Record<string, any> = {};
-  if (adapter.flatModelNameField && modelName) where[adapter.flatModelNameField.name] = modelName;
-  if (adapter.flatBrandField && brand) where[adapter.flatBrandField.name] = brand;
-
-  if (Object.keys(where).length > 0) {
-    await adapter.client[adapter.variantInfo.delegate].deleteMany({ where });
-  }
-
-  revalidatePath("/products");
-}
-
 export default async function ProductsPage({
   searchParams,
 }: {
@@ -562,14 +510,7 @@ export default async function ProductsPage({
 
   const filteredRows = q
     ? rows.filter((row) =>
-        [
-          row.modelName,
-          row.brand,
-          row.grade,
-          row.sku,
-          row.size,
-          row.color,
-        ]
+        [row.modelName, row.brand, row.grade, row.sku, row.size, row.color]
           .join(" ")
           .toLowerCase()
           .includes(q)
@@ -579,6 +520,15 @@ export default async function ProductsPage({
   return (
     <main dir="rtl" className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <Link
+            href="/dashboard"
+            className="inline-flex h-11 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold text-white transition hover:bg-white/10"
+          >
+            رجوع
+          </Link>
+        </div>
+
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight">المنتجات والمخزون</h1>
@@ -593,7 +543,7 @@ export default async function ProductsPage({
                 name="q"
                 defaultValue={q}
                 placeholder="ابحث بالموديل أو البراند أو المقاس أو SKU"
-                className="h-12 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm outline-none ring-0 placeholder:text-white/35 focus:border-red-500/60"
+                className="h-12 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm outline-none placeholder:text-white/35 focus:border-red-500/60"
               />
               <button className="h-12 rounded-2xl bg-red-600 px-6 text-sm font-bold transition hover:bg-red-500">
                 بحث
@@ -694,7 +644,7 @@ export default async function ProductsPage({
               />
 
               <label className="flex h-12 items-center justify-between rounded-2xl border border-white/10 bg-black/40 px-4 text-sm">
-                <span>تفعيل الفاريانت</span>
+                <span>تفعيل القطعة</span>
                 <input
                   name="isActive"
                   type="checkbox"
@@ -705,7 +655,7 @@ export default async function ProductsPage({
 
               <div className="md:col-span-2 xl:col-span-2">
                 <button className="h-12 w-full rounded-2xl bg-red-600 text-sm font-extrabold transition hover:bg-red-500">
-                  حفظ الفاريانت
+                  حفظ القطعة
                 </button>
               </div>
             </form>
@@ -714,11 +664,11 @@ export default async function ProductsPage({
 
         <section className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03]">
           <div className="border-b border-white/10 px-5 py-4">
-            <h2 className="text-lg font-extrabold">قائمة الفاريانتات</h2>
+            <h2 className="text-lg font-extrabold">قائمة القطعة</h2>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[1300px] w-full text-right">
+            <table className="min-w-[1200px] w-full text-right">
               <thead className="bg-white/[0.03] text-sm text-white/70">
                 <tr>
                   <th className="px-4 py-4">الموديل</th>
@@ -740,7 +690,7 @@ export default async function ProductsPage({
                 {filteredRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={isOwner ? 11 : 10}
+                      colSpan={isOwner ? 12 : 11}
                       className="px-4 py-16 text-center text-sm text-white/45"
                     >
                       لا توجد منتجات مطابقة.
@@ -784,7 +734,7 @@ export default async function ProductsPage({
 
                         {isOwner ? (
                           <td className="px-4 py-4">
-                            <div className="flex min-w-[280px] flex-col gap-3">
+                            <div className="flex min-w-[240px] flex-col gap-3">
                               <form action={restockAction} className="flex gap-2">
                                 <input type="hidden" name="variantId" value={String(row.variantDbId)} />
                                 <input
@@ -802,11 +752,7 @@ export default async function ProductsPage({
                               <div className="flex flex-wrap gap-2">
                                 <form action={toggleActiveAction}>
                                   <input type="hidden" name="variantId" value={String(row.variantDbId)} />
-                                  <input
-                                    type="hidden"
-                                    name="nextActive"
-                                    value={String(!row.isActive)}
-                                  />
+                                  <input type="hidden" name="nextActive" value={String(!row.isActive)} />
                                   <button
                                     className={`h-10 rounded-xl px-4 text-xs font-bold ${
                                       row.isActive
@@ -821,18 +767,7 @@ export default async function ProductsPage({
                                 <form action={deleteVariantAction}>
                                   <input type="hidden" name="variantId" value={String(row.variantDbId)} />
                                   <button className="h-10 rounded-xl bg-red-600/20 px-4 text-xs font-bold text-red-200 hover:bg-red-600/30">
-                                    حذف الفاريانت
-                                  </button>
-                                </form>
-
-                                <form action={deleteModelAction}>
-                                  {row.productDbId !== null ? (
-                                    <input type="hidden" name="productId" value={String(row.productDbId)} />
-                                  ) : null}
-                                  <input type="hidden" name="modelName" value={row.modelName} />
-                                  <input type="hidden" name="brand" value={row.brand} />
-                                  <button className="h-10 rounded-xl bg-white/10 px-4 text-xs font-bold text-white/85 hover:bg-white/15">
-                                    حذف الموديل بالكامل
+                                    حذف 
                                   </button>
                                 </form>
                               </div>

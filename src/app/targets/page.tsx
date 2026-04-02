@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import * as rbac from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -175,9 +176,7 @@ async function ensureOwner() {
   if (typeof requireUser === "function") {
     const user = await requireUser();
     const role = String(user?.role ?? user?.userRole ?? "").toUpperCase();
-    if (role !== "OWNER") {
-      throw new Error("غير مصرح");
-    }
+    if (role !== "OWNER") throw new Error("غير مصرح");
     return;
   }
 
@@ -237,7 +236,6 @@ function getAdapter() {
       "date",
       "invoiceDate",
     ]),
-    invoiceStatusField: pickField(invoiceModel, ["status", "paymentStatus"]),
     invoiceSellerIdField: pickField(invoiceModel, [
       "sellerId",
       "userId",
@@ -532,10 +530,19 @@ export default async function TargetsPage() {
   return (
     <main dir="rtl" className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <Link
+            href="/dashboard"
+            className="inline-flex h-11 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold text-white transition hover:bg-white/10"
+          >
+            رجوع
+          </Link>
+        </div>
+
         <div className="mb-8">
-          <h1 className="text-3xl font-extrabold tracking-tight">إدارة التارجت</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight">إدارة الأهداف</h1>
           <p className="mt-2 text-sm text-white/60">
-            صفحة مالك فقط لإدارة التارجت اليومي والشهري ومتابعة أداء البائعين بالمبيعات فقط.
+            صفحة مالك فقط لإدارة الهدف اليومي والشهري ومتابعة أداء البائعين بالمبيعات فقط.
           </p>
         </div>
 
@@ -553,14 +560,14 @@ export default async function TargetsPage() {
           </div>
 
           <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-5">
-            <div className="text-sm text-yellow-100/80">التارجت اليومي الإجمالي</div>
+            <div className="text-sm text-yellow-100/80">الهدف اليومي الإجمالي</div>
             <div className="mt-3 text-3xl font-black text-yellow-300">
               {formatEGP(totalDailyTarget)}
             </div>
           </div>
 
           <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-5">
-            <div className="text-sm text-red-100/80">التارجت الشهري الإجمالي</div>
+            <div className="text-sm text-red-100/80">الهدف الشهري الإجمالي</div>
             <div className="mt-3 text-3xl font-black text-red-300">
               {formatEGP(totalMonthlyTarget)}
             </div>
@@ -569,9 +576,9 @@ export default async function TargetsPage() {
 
         <section className="mb-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
           <div className="mb-5">
-            <h2 className="text-xl font-extrabold">إعدادات التارجت</h2>
+            <h2 className="text-xl font-extrabold">إعدادات الأهداف</h2>
             <p className="mt-1 text-sm text-white/55">
-              يمكن تحديد تارجت عام للمحل، ثم تخصيص تارجت مستقل لكل بائع.
+              يمكن تحديد هدف عام للمحل، ثم تخصيص هدف مستقل لكل بائع.
             </p>
           </div>
 
@@ -580,7 +587,7 @@ export default async function TargetsPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                <span className="mb-2 block text-sm text-white/65">التارجت اليومي العام</span>
+                <span className="mb-2 block text-sm text-white/65">الهدف اليومي العام</span>
                 <input
                   name="globalDaily"
                   type="number"
@@ -592,7 +599,7 @@ export default async function TargetsPage() {
               </label>
 
               <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                <span className="mb-2 block text-sm text-white/65">التارجت الشهري العام</span>
+                <span className="mb-2 block text-sm text-white/65">الهدف الشهري العام</span>
                 <input
                   name="globalMonthly"
                   type="number"
@@ -609,12 +616,12 @@ export default async function TargetsPage() {
                 <thead className="bg-white/[0.03] text-sm text-white/70">
                   <tr>
                     <th className="px-4 py-4">البائع</th>
-                    <th className="px-4 py-4">تارجت يومي</th>
-                    <th className="px-4 py-4">تارجت شهري</th>
+                    <th className="px-4 py-4">هدف يومي</th>
+                    <th className="px-4 py-4">هدف شهري</th>
                     <th className="px-4 py-4">مبيعات اليوم</th>
                     <th className="px-4 py-4">مبيعات الشهر</th>
-                    <th className="px-4 py-4">تقدّم اليوم</th>
-                    <th className="px-4 py-4">تقدّم الشهر</th>
+                    <th className="px-4 py-4">تقدم اليوم</th>
+                    <th className="px-4 py-4">تقدم الشهر</th>
                   </tr>
                 </thead>
 
@@ -698,7 +705,7 @@ export default async function TargetsPage() {
 
             <div className="flex justify-end">
               <button className="h-12 rounded-2xl bg-red-600 px-8 text-sm font-extrabold transition hover:bg-red-500">
-                حفظ التارجت
+                حفظ الأهداف
               </button>
             </div>
           </form>
