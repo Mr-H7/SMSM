@@ -33,23 +33,23 @@ export default async function LoginPage(props: { searchParams: Promise<{ e?: str
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-4" dir="rtl">
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-white/5 p-6">
         <h1 className="text-2xl font-bold mb-2">تسجيل الدخول</h1>
-        <p className="text-sm text-white/60 mb-4">نظام إدارة محل الأحذية</p>
+        <p className="text-sm text-white/60 mb-4">احلا سيستم ده ولا ايه    </p>
 
         {e === "1" && (
           <div className="mb-4 rounded-xl border border-red-500/30 bg-red-600/10 p-3 text-sm text-red-300">
-            بيانات الدخول غير صحيحة
+            جرب تاني يعم بتغلط ليه
           </div>
         )}
         {e === "2" && (
           <div className="mb-4 rounded-xl border border-red-500/30 bg-red-600/10 p-3 text-sm text-red-300">
-            هذا الحساب غير مُفعل
+          سمسم مش حاطك في السيستم
           </div>
         )}
 
         <form action={loginAction} className="space-y-3">
           <input
             name="username"
-            placeholder="اسم المستخدم"
+            placeholder="اسم الكريم ايه"
             className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
             required
           />
@@ -66,10 +66,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ e?: str
           </button>
         </form>
 
-        <div className="mt-4 text-xs text-white/50">
-          الافتراضي بعد الريست: <span className="font-mono">owner / Owner@1234</span>
         </div>
-      </div>
     </div>
   );
 }

@@ -21,6 +21,14 @@ function endOfDay(d: Date) {
   return x;
 }
 
+function formatEGP(value: number) {
+  return new Intl.NumberFormat("ar-EG", {
+    style: "currency",
+    currency: "EGP",
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
 export default async function ProfitReportPage({
   searchParams,
 }: {
@@ -33,22 +41,31 @@ export default async function ProfitReportPage({
   const fromInput = toDateOnly(sp.from);
   const toInput = toDateOnly(sp.to);
 
-  // default: today
-  const now = new Date();
-  const from = startOfDay(fromInput ?? now);
-  const to = endOfDay(toInput ?? now);
+  const where =
+    fromInput || toInput
+      ? {
+          createdAt: {
+            ...(fromInput ? { gte: startOfDay(fromInput) } : {}),
+            ...(toInput ? { lte: endOfDay(toInput) } : {}),
+          },
+        }
+      : {};
 
   const sales = await prisma.sale.findMany({
-    where: {
-      createdAt: { gte: from, lte: to },
-    },
+    where,
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
       createdAt: true,
       total: true,
       discount: true,
-      seller: { select: { id: true, username: true, fullName: true } },
+      seller: {
+        select: {
+          id: true,
+          username: true,
+          fullName: true,
+        },
+      },
       items: {
         select: {
           qty: true,
@@ -59,15 +76,22 @@ export default async function ProfitReportPage({
     },
   });
 
-  // totals
-  let revenue = 0; // before discount = sum(items.qty*sellPrice)
-  let cost = 0; // sum(items.qty*costPrice)
-  let discount = 0; // sum(sale.discount)
-  let net = 0; // sum(sale.total)
+  let revenue = 0;
+  let cost = 0;
+  let discount = 0;
+  let net = 0;
 
   const bySeller = new Map<
     string,
-    { name: string; revenue: number; net: number; discount: number; cost: number; profit: number; salesCount: number }
+    {
+      name: string;
+      revenue: number;
+      net: number;
+      discount: number;
+      cost: number;
+      profit: number;
+      salesCount: number;
+    }
   >();
 
   for (const s of sales) {
@@ -92,8 +116,15 @@ export default async function ProfitReportPage({
     net += saleNet;
 
     const cur =
-      bySeller.get(sellerId) ??
-      { name: sellerName, revenue: 0, net: 0, discount: 0, cost: 0, profit: 0, salesCount: 0 };
+      bySeller.get(sellerId) ?? {
+        name: sellerName,
+        revenue: 0,
+        net: 0,
+        discount: 0,
+        cost: 0,
+        profit: 0,
+        salesCount: 0,
+      };
 
     cur.revenue += saleRevenue;
     cur.net += saleNet;
@@ -106,7 +137,6 @@ export default async function ProfitReportPage({
   }
 
   const profit = net - cost;
-
   const sellers = Array.from(bySeller.values()).sort((a, b) => b.profit - a.profit);
 
   return (
@@ -116,18 +146,22 @@ export default async function ProfitReportPage({
           <div>
             <h1 className="text-2xl font-bold">تقرير الأرباح (Owner)</h1>
             <p className="mt-1 text-sm text-white/60">
-              من {from.toLocaleDateString("ar-EG")} إلى {to.toLocaleDateString("ar-EG")}
+              {fromInput || toInput
+                ? `من ${fromInput ? startOfDay(fromInput).toLocaleDateString("ar-EG") : "البداية"} إلى ${
+                    toInput ? endOfDay(toInput).toLocaleDateString("ar-EG") : "الآن"
+                  }`
+                : "كل البيانات من بداية التشغيل"}
             </p>
           </div>
+
           <a
-            href="/dashboard"
+            href="/reports"
             className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
           >
             رجوع
           </a>
         </div>
 
-        {/* Filters */}
         <div className="mb-5 rounded-2xl border border-white/10 bg-white/5 p-4">
           <form action="/reports/profit" method="get" className="grid gap-3 md:grid-cols-12">
             <div className="md:col-span-4">
@@ -139,6 +173,7 @@ export default async function ProfitReportPage({
                 className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
               />
             </div>
+
             <div className="md:col-span-4">
               <label className="mb-1 block text-sm text-white/70">إلى</label>
               <input
@@ -148,61 +183,63 @@ export default async function ProfitReportPage({
                 className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
               />
             </div>
+
             <div className="md:col-span-4 flex items-end gap-2">
               <button className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold hover:bg-red-500">
                 تطبيق
               </button>
               <a
                 href="/reports/profit"
-                className="w-full text-center rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm hover:bg-white/10"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm hover:bg-white/10"
               >
-                اليوم
+                الكل
               </a>
             </div>
           </form>
         </div>
 
-        {/* KPI */}
         <div className="grid gap-3 md:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-sm text-white/60">Revenue</div>
-            <div className="mt-1 text-2xl font-extrabold">{revenue}</div>
+            <div className="text-sm text-white/60">إجمالي البيع</div>
+            <div className="mt-1 text-2xl font-extrabold">{formatEGP(revenue)}</div>
           </div>
+
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-sm text-white/60">Discount</div>
-            <div className="mt-1 text-2xl font-extrabold">{discount}</div>
+            <div className="text-sm text-white/60">إجمالي الخصم</div>
+            <div className="mt-1 text-2xl font-extrabold">{formatEGP(discount)}</div>
           </div>
+
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-sm text-white/60">Cost</div>
-            <div className="mt-1 text-2xl font-extrabold">{cost}</div>
+            <div className="text-sm text-white/60">إجمالي التكلفة</div>
+            <div className="mt-1 text-2xl font-extrabold">{formatEGP(cost)}</div>
           </div>
+
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-sm text-white/60">Profit</div>
-            <div className="mt-1 text-2xl font-extrabold text-red-500">{profit}</div>
+            <div className="text-sm text-white/60">صافي الربح</div>
+            <div className="mt-1 text-2xl font-extrabold text-red-500">{formatEGP(profit)}</div>
           </div>
         </div>
 
-        {/* Seller breakdown */}
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto">
-          <h2 className="mb-3 text-lg font-bold">أرباح حسب البائع</h2>
+          <h2 className="mb-3 text-lg font-bold">الأرباح حسب البائع</h2>
 
           <table className="w-full min-w-[950px] border-collapse text-right text-sm">
             <thead>
               <tr className="border-b border-white/10 text-white/70">
                 <th className="py-3">البائع</th>
                 <th className="py-3">عدد الفواتير</th>
-                <th className="py-3">Revenue</th>
-                <th className="py-3">Discount</th>
-                <th className="py-3">Net</th>
-                <th className="py-3">Cost</th>
-                <th className="py-3">Profit</th>
+                <th className="py-3">إجمالي البيع</th>
+                <th className="py-3">الخصم</th>
+                <th className="py-3">الصافي</th>
+                <th className="py-3">التكلفة</th>
+                <th className="py-3">الربح</th>
               </tr>
             </thead>
             <tbody>
               {sellers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-white/50">
-                    لا توجد بيانات
+                    لا توجد نتائج
                   </td>
                 </tr>
               ) : (
@@ -210,11 +247,11 @@ export default async function ProfitReportPage({
                   <tr key={idx} className="border-b border-white/5">
                     <td className="py-3 font-semibold">{x.name}</td>
                     <td className="py-3">{x.salesCount}</td>
-                    <td className="py-3">{x.revenue}</td>
-                    <td className="py-3">{x.discount}</td>
-                    <td className="py-3">{x.net}</td>
-                    <td className="py-3">{x.cost}</td>
-                    <td className="py-3 font-bold text-red-400">{x.profit}</td>
+                    <td className="py-3">{formatEGP(x.revenue)}</td>
+                    <td className="py-3">{formatEGP(x.discount)}</td>
+                    <td className="py-3">{formatEGP(x.net)}</td>
+                    <td className="py-3">{formatEGP(x.cost)}</td>
+                    <td className="py-3 font-bold text-red-400">{formatEGP(x.profit)}</td>
                   </tr>
                 ))
               )}
@@ -222,9 +259,8 @@ export default async function ProfitReportPage({
           </table>
         </div>
 
-        {/* Small note */}
         <div className="mt-4 text-xs text-white/40">
-          * Profit محسوب من: Net (بعد الخصم) - Cost (snapshot من SaleItem).
+          * الربح = الصافي بعد الخصم - تكلفة البيع المخزنة داخل SaleItem.
         </div>
       </div>
     </div>

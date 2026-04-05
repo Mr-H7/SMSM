@@ -128,8 +128,15 @@ export default async function DashboardPage() {
               >
                 المرتجعات
               </Link>
+
               {isOwner ? (
                 <>
+                  <Link
+                    href="/reports"
+                    className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
+                  >
+                    التقارير
+                  </Link>
                   <Link
                     href="/targets"
                     className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
@@ -288,6 +295,16 @@ export default async function DashboardPage() {
 
                 {isOwner ? (
                   <>
+                    <Link
+                      href="/reports"
+                      className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
+                    >
+                      <div className="text-lg font-extrabold">التقارير</div>
+                      <div className="mt-2 text-sm text-white/55">
+                        تقارير التشغيل والأرباح والمراجعة العامة.
+                      </div>
+                    </Link>
+
                     <Link
                       href="/targets"
                       className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"

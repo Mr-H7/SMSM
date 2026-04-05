@@ -52,9 +52,18 @@ export default function SalesNewClient({
       }
 
       if (!q) return true;
+
       const name = `${v.model.brand ?? ""} ${v.model.name}`.toLowerCase();
       const sku = (v.sku ?? "").toLowerCase();
-      return name.includes(q) || sku.includes(q);
+      const color = (v.color ?? "").toLowerCase();
+      const size = (v.size ?? "").toLowerCase();
+
+      return (
+        name.includes(q) ||
+        sku.includes(q) ||
+        color.includes(q) ||
+        size.includes(q)
+      );
     });
   }, [variants, query, exactPrice, grade]);
 
@@ -78,10 +87,16 @@ export default function SalesNewClient({
 
   function setQty(variantId: string, qty: number) {
     setError(null);
+
+    const variant = variants.find((v) => v.id === variantId);
+    if (!variant) return;
+
     const q = Math.max(0, Math.trunc(qty || 0));
+    const safeQty = Math.min(q, Math.max(0, variant.stockQty));
+
     setCart((prev) => {
       const next = prev.filter((x) => x.variantId !== variantId);
-      if (q > 0) next.push({ variantId, qty: q });
+      if (safeQty > 0) next.push({ variantId, qty: safeQty });
       return next;
     });
   }
@@ -98,6 +113,7 @@ export default function SalesNewClient({
 
   function submit() {
     setError(null);
+
     if (cart.length === 0) {
       setError("السلة فاضية");
       return;
@@ -124,12 +140,12 @@ export default function SalesNewClient({
 
   return (
     <div className="min-h-screen bg-black text-white" dir="rtl">
-      <div className="mx-auto w-full max-w-6xl px-4 py-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">بيع جديد (POS)</h1>
             <p className="mt-1 text-sm text-white/60">
-              اختر المنتج ← أضف للسلة ← نفّذ البيع ← اطبع الفاتورة
+              اختر الفاريانت ثم أضف الكمية ونفّذ البيع
             </p>
           </div>
 
@@ -141,11 +157,12 @@ export default function SalesNewClient({
           </a>
         </div>
 
-        {/* Filters */}
         <div className="mb-5 rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="grid gap-3 md:grid-cols-12">
             <div className="md:col-span-6">
-              <label className="mb-1 block text-sm text-white/70">بحث (اسم/براند/SKU)</label>
+              <label className="mb-1 block text-sm text-white/70">
+                بحث (اسم / براند / SKU / لون / مقاس)
+              </label>
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -179,22 +196,22 @@ export default function SalesNewClient({
           </div>
         </div>
 
-        {/* List */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto">
-          <table className="w-full min-w-[1050px] border-collapse text-right text-sm">
+          <table className="w-full min-w-[1150px] border-collapse text-right text-sm">
             <thead>
               <tr className="border-b border-white/10 text-white/70">
                 <th className="py-3">المنتج</th>
-                <th className="py-3">Grade</th>
-                <th className="py-3">Size</th>
-                <th className="py-3">Color</th>
+                <th className="py-3">الدرجة</th>
+                <th className="py-3">المقاس</th>
+                <th className="py-3">اللون</th>
                 <th className="py-3">SKU</th>
-                <th className="py-3">Sell</th>
-                <th className="py-3">Stock</th>
-                <th className="py-3">Qty</th>
-                <th className="py-3">+</th>
+                <th className="py-3">السعر</th>
+                <th className="py-3">المخزون</th>
+                <th className="py-3">الكمية</th>
+                <th className="py-3">إضافة</th>
               </tr>
             </thead>
+
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
@@ -209,28 +226,29 @@ export default function SalesNewClient({
 
                   return (
                     <tr key={v.id} className="border-b border-white/5">
-                      <td className="py-3 font-semibold">{name}</td>
-                      <td className="py-3">{v.grade}</td>
-                      <td className="py-3">{v.size ?? "-"}</td>
-                      <td className="py-3">{v.color ?? "-"}</td>
-                      <td className="py-3">{v.sku ?? "-"}</td>
-                      <td className="py-3 font-bold text-red-400">{v.sellPrice}</td>
-                      <td className="py-3">{v.stockQty}</td>
-                      <td className="py-3">
+                      <td className="py-4 font-semibold">{name}</td>
+                      <td className="py-4">{v.grade}</td>
+                      <td className="py-4">{v.size ?? "-"}</td>
+                      <td className="py-4">{v.color ?? "-"}</td>
+                      <td className="py-4">{v.sku ?? "-"}</td>
+                      <td className="py-4 font-bold text-red-400">{v.sellPrice}</td>
+                      <td className="py-4">{v.stockQty}</td>
+                      <td className="py-4">
                         <input
                           type="number"
                           value={qty}
                           min={0}
+                          max={v.stockQty}
                           onChange={(e) => setQty(v.id, Number(e.target.value))}
                           className="w-24 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-red-500"
                         />
                       </td>
-                      <td className="py-3">
+                      <td className="py-4">
                         <button
                           type="button"
                           onClick={() => addOne(v.id)}
-                          className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold hover:bg-red-500 disabled:opacity-50"
                           disabled={v.stockQty <= 0}
+                          className="rounded-lg bg-red-600 px-4 py-2 text-xs font-bold hover:bg-red-500 disabled:opacity-50"
                         >
                           +1
                         </button>
@@ -243,7 +261,6 @@ export default function SalesNewClient({
           </table>
         </div>
 
-        {/* Cart Summary */}
         <div className="mt-5 grid gap-3 md:grid-cols-12">
           <div className="md:col-span-7 rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="grid gap-3 md:grid-cols-12">

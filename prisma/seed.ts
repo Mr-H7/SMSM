@@ -3,7 +3,7 @@ import { hashPassword } from "../src/lib/auth";
 
 async function main() {
   const username = "SMSM";
-  const plainPassword = "SMsm1";
+  const plainPassword = "smsm1907";
 
   const existingUser = await prisma.user.findUnique({
     where: { username },
@@ -22,7 +22,7 @@ async function main() {
       },
     });
 
-    console.log("Updated owner user: SMSM / SMsm1");
+    console.log("Updated owner user: SMSM / smsm1907");
     return;
   }
 
@@ -36,7 +36,7 @@ async function main() {
     },
   });
 
-  console.log("Seeded owner user: SMSM / SMsm1");
+  console.log("Seeded owner user: SMSM / smsm1907");
 }
 
 main()

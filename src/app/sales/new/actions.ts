@@ -34,115 +34,132 @@ export async function createSale(formData: FormData) {
   const discount = parseIntSafe(formData.get("discount"), 0);
 
   const itemsJson = normalizeText(formData.get("itemsJson"));
-  if (!itemsJson) throw new Error("Cart is empty");
+  if (!itemsJson) throw new Error("السلة فاضية");
 
   let items: CartItemInput[];
   try {
     items = JSON.parse(itemsJson);
   } catch {
-    throw new Error("Invalid cart payload");
+    throw new Error("بيانات السلة غير صالحة");
   }
 
-  if (!Array.isArray(items) || items.length === 0) throw new Error("Cart is empty");
-
-  // sanitize + merge duplicates
-  const merged = new Map<string, number>();
-  for (const it of items) {
-    const variantId = String(it?.variantId ?? "").trim();
-    const qty = Number(it?.qty ?? 0);
-    if (!variantId) continue;
-    if (!Number.isFinite(qty) || qty <= 0) continue;
-    merged.set(variantId, (merged.get(variantId) ?? 0) + Math.trunc(qty));
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("السلة فاضية");
   }
 
-  const finalItems = Array.from(merged.entries()).map(([variantId, qty]) => ({ variantId, qty }));
-  if (finalItems.length === 0) throw new Error("Cart is empty");
+  const cleaned = items
+    .map((it) => ({
+      variantId: String(it?.variantId ?? "").trim(),
+      qty: Math.max(0, Math.trunc(Number(it?.qty ?? 0))),
+    }))
+    .filter((it) => it.variantId && it.qty > 0);
 
-  const result = await prisma.$transaction(async (tx) => {
-    // fetch all variants snapshot (server-side only)
-    const variants = await tx.productVariant.findMany({
-      where: { id: { in: finalItems.map((i) => i.variantId) } },
-      select: {
-        id: true,
-        sellPrice: true,
-        costPrice: true,
-        stockQty: true,
-        isActive: true,
-      },
-    });
+  if (cleaned.length === 0) {
+    throw new Error("السلة فاضية");
+  }
 
-    const variantMap = new Map(variants.map((v) => [v.id, v]));
+  const mergedMap = new Map<string, CartItemInput>();
 
-    // Validate existence + active + stock
-    for (const it of finalItems) {
-      const v = variantMap.get(it.variantId);
-      if (!v) throw new Error("Variant not found");
-      if (!v.isActive) throw new Error("Variant is inactive");
-      const currentStock = v.stockQty ?? 0;
-      if (it.qty > currentStock) {
-        throw new Error(`Insufficient stock. Available: ${currentStock}`);
-      }
+  for (const item of cleaned) {
+    const key = item.variantId;
+    const current = mergedMap.get(key);
+    if (current) {
+      current.qty += item.qty;
+    } else {
+      mergedMap.set(key, { ...item });
     }
+  }
 
-    // compute subtotal
-    let subtotal = 0;
-    for (const it of finalItems) {
-      const v = variantMap.get(it.variantId)!;
-      subtotal += it.qty * v.sellPrice;
-    }
+  const finalItems = Array.from(mergedMap.values());
 
-    const safeDiscount = Math.max(0, discount);
-    const total = Math.max(0, subtotal - safeDiscount);
-
-    // create sale
-    const sale = await tx.sale.create({
-      data: {
-        sellerId: user.id,
-        customer,
-        total,
-        discount: safeDiscount,
-      },
-      select: { id: true },
-    });
-
-    // deduct stock ATOMIC + create sale items
-    for (const it of finalItems) {
-      const v = variantMap.get(it.variantId)!;
-
-      // HARD LOCK: prevents negative stock in concurrency
-      const updated = await tx.productVariant.updateMany({
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const variants = await tx.productVariant.findMany({
         where: {
-          id: v.id,
-          stockQty: { gte: it.qty },
+          id: { in: finalItems.map((i) => i.variantId) },
         },
-        data: {
-          stockQty: { decrement: it.qty },
+        select: {
+          id: true,
+          sellPrice: true,
+          costPrice: true,
+          stockQty: true,
+          isActive: true,
         },
       });
 
-      if (updated.count !== 1) {
-        throw new Error("المخزون اتغير أثناء تنفيذ البيع — حاول تاني");
+      const variantMap = new Map(variants.map((v) => [v.id, v]));
+
+      for (const it of finalItems) {
+        const v = variantMap.get(it.variantId);
+        if (!v) throw new Error("القطعة غير موجودة");
+        if (!v.isActive) throw new Error("القطعة غير نشطة");
+
+        const currentStock = v.stockQty ?? 0;
+        if (it.qty > currentStock) {
+          throw new Error(`المخزون غير كافٍ. المتاح: ${currentStock}`);
+        }
       }
 
-      await tx.saleItem.create({
-        data: {
-          saleId: sale.id,
-          variantId: v.id,
-          qty: it.qty,
-          sellPrice: v.sellPrice,
-          costPrice: v.costPrice, // snapshot server-side only
-        },
-      });
-    }
+      let subtotal = 0;
+      for (const it of finalItems) {
+        const v = variantMap.get(it.variantId)!;
+        subtotal += it.qty * v.sellPrice;
+      }
 
-    return { saleId: sale.id, total };
-  });
+      const safeDiscount = Math.max(0, discount);
+      const total = Math.max(0, subtotal - safeDiscount);
+
+      const sale = await tx.sale.create({
+        data: {
+          sellerId: user.id,
+          customer,
+          total,
+          discount: safeDiscount,
+        },
+        select: { id: true },
+      });
+
+      for (const it of finalItems) {
+        const v = variantMap.get(it.variantId)!;
+
+        const updated = await tx.productVariant.updateMany({
+          where: {
+            id: v.id,
+            stockQty: { gte: it.qty },
+          },
+          data: {
+            stockQty: { decrement: it.qty },
+          },
+        });
+
+        if (updated.count !== 1) {
+          throw new Error("المخزون اتغير أثناء تنفيذ البيع — حاول تاني");
+        }
+
+        await tx.saleItem.create({
+          data: {
+            saleId: sale.id,
+            variantId: v.id,
+            qty: it.qty,
+            sellPrice: v.sellPrice,
+            costPrice: v.costPrice,
+          },
+        });
+      }
+
+      return { saleId: sale.id, total };
+    },
+    {
+      maxWait: 10000,
+      timeout: 20000,
+    }
+  );
 
   revalidatePath("/sales/new");
   revalidatePath("/invoices");
   revalidatePath("/dashboard");
-  // reports owner-only anyway, revalidate harmless but optional
   revalidatePath("/reports");
+  revalidatePath("/reports/profit");
 
   return { ok: true as const, saleId: result.saleId, total: result.total };
 }

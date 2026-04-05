@@ -2,13 +2,23 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/rbac";
 
+export const dynamic = "force-dynamic";
+
 function startOfToday() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
-export default async function ReportsHomePage() {
+function formatEGP(value: number) {
+  return new Intl.NumberFormat("ar-EG", {
+    style: "currency",
+    currency: "EGP",
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+export default async function ReportsPage() {
   const user = await requireOwner();
   const today = startOfToday();
 
@@ -18,6 +28,11 @@ export default async function ReportsHomePage() {
     todayReturnsCount,
     todayReturnsAgg,
     invoicesWithReturnsCount,
+    totalSalesCount,
+    totalSalesAgg,
+    totalReturnsCount,
+    totalProductsCount,
+    lowStockCount,
   ] = await Promise.all([
     prisma.sale.count({
       where: {
@@ -59,6 +74,25 @@ export default async function ReportsHomePage() {
         },
       },
     }),
+
+    prisma.sale.count(),
+
+    prisma.sale.aggregate({
+      _sum: {
+        total: true,
+        discount: true,
+      },
+    }),
+
+    prisma.saleReturn.count(),
+
+    prisma.productVariant.count(),
+
+    prisma.productVariant.count({
+      where: {
+        stockQty: { lte: 5 },
+      },
+    }),
   ]);
 
   const todaySalesTotal = Number(todaySalesAgg._sum.total ?? 0);
@@ -67,6 +101,9 @@ export default async function ReportsHomePage() {
   const todayReturnedValue = Number(todayReturnsAgg._sum.returnedValue ?? 0);
   const todayRefundTotal = Number(todayReturnsAgg._sum.refundAmount ?? 0);
   const todayExtraAmount = Number(todayReturnsAgg._sum.extraAmount ?? 0);
+
+  const allSalesTotal = Number(totalSalesAgg._sum.total ?? 0);
+  const allDiscountsTotal = Number(totalSalesAgg._sum.discount ?? 0);
 
   return (
     <div className="min-h-screen bg-black text-white" dir="rtl">
@@ -96,16 +133,16 @@ export default async function ReportsHomePage() {
 
           <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
             <div className="text-sm text-emerald-200">إجمالي بيع اليوم</div>
-            <div className="mt-2 text-3xl font-extrabold text-emerald-300">
-              {todaySalesTotal}
+            <div className="mt-2 text-2xl font-extrabold text-emerald-300">
+              {formatEGP(todaySalesTotal)}
             </div>
             <div className="mt-2 text-xs text-white/40">إجمالي الفواتير اليوم</div>
           </div>
 
           <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-5">
             <div className="text-sm text-yellow-200">خصومات اليوم</div>
-            <div className="mt-2 text-3xl font-extrabold text-yellow-300">
-              {todayDiscountTotal}
+            <div className="mt-2 text-2xl font-extrabold text-yellow-300">
+              {formatEGP(todayDiscountTotal)}
             </div>
             <div className="mt-2 text-xs text-white/40">إجمالي الخصومات اليوم</div>
           </div>
@@ -128,7 +165,7 @@ export default async function ReportsHomePage() {
         <div className="mb-8 grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="text-sm text-white/60">صافي المرتجع اليوم</div>
-            <div className="mt-2 text-3xl font-extrabold">{todayReturnedValue}</div>
+            <div className="mt-2 text-2xl font-extrabold">{formatEGP(todayReturnedValue)}</div>
             <div className="mt-2 text-xs text-white/40">
               بعد توزيع الخصم على الجزء المرتجع
             </div>
@@ -136,18 +173,40 @@ export default async function ReportsHomePage() {
 
           <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
             <div className="text-sm text-emerald-200">المبالغ المستردة اليوم</div>
-            <div className="mt-2 text-3xl font-extrabold text-emerald-300">
-              {todayRefundTotal}
+            <div className="mt-2 text-2xl font-extrabold text-emerald-300">
+              {formatEGP(todayRefundTotal)}
             </div>
             <div className="mt-2 text-xs text-white/40">فلوس رجعت للعميل</div>
           </div>
 
           <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-5">
             <div className="text-sm text-yellow-200">إضافي على العملاء اليوم</div>
-            <div className="mt-2 text-3xl font-extrabold text-yellow-300">
-              {todayExtraAmount}
+            <div className="mt-2 text-2xl font-extrabold text-yellow-300">
+              {formatEGP(todayExtraAmount)}
             </div>
             <div className="mt-2 text-xs text-white/40">فرق الاستبدال المدفوع</div>
+          </div>
+        </div>
+
+        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="text-sm text-white/60">إجمالي الفواتير</div>
+            <div className="mt-2 text-3xl font-extrabold">{totalSalesCount}</div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="text-sm text-white/60">إجمالي المبيعات</div>
+            <div className="mt-2 text-2xl font-extrabold">{formatEGP(allSalesTotal)}</div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="text-sm text-white/60">إجمالي الخصومات</div>
+            <div className="mt-2 text-2xl font-extrabold">{formatEGP(allDiscountsTotal)}</div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="text-sm text-white/60">إجمالي المرتجعات</div>
+            <div className="mt-2 text-3xl font-extrabold">{totalReturnsCount}</div>
           </div>
         </div>
 
@@ -188,20 +247,30 @@ export default async function ReportsHomePage() {
             <div className="mt-4 text-sm text-red-300">اضغط للدخول →</div>
           </Link>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 opacity-90">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-lg font-bold text-white">تقارير إضافية</div>
+              <div className="text-lg font-bold text-white">إحصاءات عامة</div>
               <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">
-                Soon
+                Summary
               </span>
             </div>
 
-            <p className="mt-2 text-sm text-white/70">
-              جاهزة لإضافة تقارير مثل: أفضل المنتجات، أداء البائعين، أكثر المقاسات
-              مبيعًا، وتحليل المرتجعات.
-            </p>
+            <div className="mt-4 space-y-3 text-sm text-white/75">
+              <div className="flex items-center justify-between">
+                <span>إجمالي المنتجات</span>
+                <span className="font-bold">{totalProductsCount}</span>
+              </div>
 
-            <div className="mt-4 text-sm text-white/40">قريبًا</div>
+              <div className="flex items-center justify-between">
+                <span>منخفض المخزون</span>
+                <span className="font-bold">{lowStockCount}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span>فواتير بها مرتجع</span>
+                <span className="font-bold">{invoicesWithReturnsCount}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
