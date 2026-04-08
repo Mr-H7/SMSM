@@ -42,6 +42,17 @@ export async function deleteModel(formData: FormData): Promise<void> {
   const id = t(formData.get("id"));
   if (!id) throw new Error("معرّف الموديل غير موجود");
 
+  const variants = await prisma.productVariant.findMany({
+    where: { modelId: id },
+    select: { id: true, items: { select: { id: true }, take: 1 } },
+  });
+
+  const hasSoldVariant = variants.some((variant) => variant.items.length > 0);
+
+  if (hasSoldVariant) {
+    throw new Error("لا يمكن حذف الموديل لأن عليه مبيعات مسجلة");
+  }
+
   await prisma.productVariant.deleteMany({
     where: { modelId: id },
   });
@@ -110,14 +121,68 @@ export async function createVariant(formData: FormData): Promise<void> {
   revalidatePath("/products");
 }
 
+export async function updateVariant(formData: FormData): Promise<void> {
+  await requireOwnerAction();
+
+  const variantId = t(formData.get("variantId"));
+  const modelName = t(formData.get("modelName"));
+  const brand = t(formData.get("brand")) || null;
+  const grade = normalizeGrade(t(formData.get("grade")));
+  const sellPrice = int(formData.get("sellPrice"));
+  const costPrice = int(formData.get("costPrice"));
+  const size = t(formData.get("size")) || null;
+  const color = t(formData.get("color")) || null;
+  const sku = t(formData.get("sku")) || null;
+
+  if (!variantId) throw new Error("معرّف النسخة غير موجود");
+  if (!modelName) throw new Error("اسم الموديل مطلوب");
+  if (!sellPrice || sellPrice <= 0) throw new Error("سعر البيع مطلوب");
+  if (costPrice < 0) throw new Error("سعر التكلفة غير صحيح");
+
+  const existing = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+    include: { model: true },
+  });
+
+  if (!existing) throw new Error("المنتج غير موجود");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.productModel.update({
+      where: { id: existing.modelId },
+      data: {
+        name: modelName,
+        brand,
+      },
+    });
+
+    await tx.productVariant.update({
+      where: { id: variantId },
+      data: {
+        grade,
+        sellPrice,
+        costPrice,
+        size,
+        color,
+        sku,
+      },
+    });
+  });
+
+  revalidatePath("/products");
+}
+
 export async function deleteVariant(formData: FormData): Promise<void> {
   await requireOwnerAction();
 
   const id = t(formData.get("id"));
   if (!id) throw new Error("معرّف النسخة غير موجود");
 
-  await prisma.productVariant.delete({
+  await prisma.productVariant.update({
     where: { id },
+    data: {
+      isActive: false,
+      stockQty: 0,
+    },
   });
 
   revalidatePath("/products");

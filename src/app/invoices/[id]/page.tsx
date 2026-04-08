@@ -4,20 +4,14 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
 import PrintButton from "./PrintButton";
+import {
+  addDays,
+  formatCairoDate,
+  formatCairoDateTime,
+} from "@/lib/cairo-time";
 
 function money(n: number) {
   return new Intl.NumberFormat("ar-EG").format(n || 0);
-}
-
-function dateTime(d: Date | string) {
-  const value = new Date(d);
-  return new Intl.DateTimeFormat("ar-EG", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(value);
 }
 
 function getCustomerName(sale: any) {
@@ -98,12 +92,41 @@ export default async function InvoiceDetailsPage({
   );
 
   const hasReturns = (sale.returns || []).length > 0;
+  const returnLastDate = addDays(sale.createdAt, 10);
 
   return (
     <div
       dir="rtl"
       className="min-h-screen bg-black text-white print:bg-white print:text-black"
     >
+      <style>
+        {`
+          @page {
+            size: 80mm 210mm;
+            margin: 0;
+          }
+
+          @media print {
+            html, body {
+              width: 80mm;
+              background: #ffffff !important;
+            }
+
+            body {
+              margin: 0 !important;
+              padding: 0 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          }
+        `}
+      </style>
+
       <div className="mx-auto max-w-5xl px-4 py-8 print:max-w-none print:px-0 print:py-0">
         <div className="mb-6 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-3">
@@ -129,33 +152,38 @@ export default async function InvoiceDetailsPage({
           <PrintButton />
         </div>
 
-        <div className="mx-auto w-full max-w-[380px] overflow-hidden rounded-2xl border border-neutral-200 bg-white text-black shadow-2xl print:max-w-[80mm] print:rounded-none print:border-0 print:shadow-none">
-          <div className="border-b border-neutral-200 px-4 py-4 text-center">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-white">
+        <div className="mx-auto w-full max-w-[302px] overflow-hidden rounded-2xl border border-neutral-200 bg-white text-black shadow-2xl print:max-w-[80mm] print:rounded-none print:border-0 print:shadow-none">
+          <div className="border-b border-neutral-200 bg-white px-4 py-4 text-center">
+            <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-white">
               <Image
                 src="/smsm-logo.png"
                 alt="SMSM Logo"
-                width={64}
-                height={64}
+                width={80}
+                height={80}
                 className="h-full w-full object-contain p-2"
                 priority
+                unoptimized
               />
             </div>
 
-            <h1 className="text-xl font-black">SMSM</h1>
-            <p className="mt-1 text-xs text-neutral-600">فاتورة بيع</p>
+            <h1 className="text-xl font-black tracking-wide">SMSM</h1>
+            <p className="mt-1 text-xs text-neutral-700">فاتورة بيع</p>
             <p className="text-[11px] text-neutral-500">Shoes Store Management</p>
           </div>
 
           <div className="space-y-2 border-b border-neutral-200 px-4 py-4 text-sm">
             <div className="flex items-start justify-between gap-3">
               <span className="text-neutral-500">رقم الفاتورة</span>
-              <span className="max-w-[180px] break-all text-left font-bold">{sale.id}</span>
+              <span className="max-w-[180px] break-all text-left font-bold">
+                {sale.id}
+              </span>
             </div>
 
             <div className="flex items-center justify-between gap-3">
               <span className="text-neutral-500">التاريخ</span>
-              <span className="font-bold">{dateTime(sale.createdAt)}</span>
+              <span className="font-bold">
+                {formatCairoDateTime(sale.createdAt)}
+              </span>
             </div>
 
             <div className="flex items-center justify-between gap-3">
@@ -248,7 +276,9 @@ export default async function InvoiceDetailsPage({
 
           {hasReturns ? (
             <div className="border-t border-neutral-200 px-4 py-4">
-              <div className="mb-3 text-center text-sm font-black">المرتجعات / الاستبدال</div>
+              <div className="mb-3 text-center text-sm font-black">
+                المرتجعات / الاستبدال
+              </div>
 
               <div className="space-y-3">
                 {sale.returns.map((ret: any) => (
@@ -261,7 +291,7 @@ export default async function InvoiceDetailsPage({
                         {ret.type === "EXCHANGE" ? "استبدال" : "مرتجع"}
                       </span>
                       <span className="text-xs text-neutral-500">
-                        {dateTime(ret.createdAt)}
+                        {formatCairoDateTime(ret.createdAt)}
                       </span>
                     </div>
 
@@ -280,10 +310,15 @@ export default async function InvoiceDetailsPage({
             </div>
           ) : null}
 
+          <div className="border-t border-neutral-200 bg-red-50 px-4 py-3 text-center text-[11px] leading-6 text-red-700">
+            آخر موعد للاسترجاع:{"10 أيام "}
+            <span className="font-black">{formatCairoDate(returnLastDate)}</span>
+          </div>
+
           <div className="border-t border-neutral-200 px-4 py-4 text-center text-[11px] leading-6 text-neutral-500">
             شكرًا لتعاملكم مع SMSM
             <br />
-            يرجى الاحتفاظ بالفاتورة للاستبدال أو المرتجع
+            يرجى الاحتفاظ بالفاتورة حتى آخر موعد للاسترجاع
           </div>
         </div>
       </div>

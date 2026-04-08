@@ -1,7 +1,13 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import * as rbac from "@/lib/rbac";
-import { revalidatePath } from "next/cache";
-import Link from "next/link";
+import {
+  createVariant,
+  deleteVariant,
+  restockVariant,
+  toggleVariantActive,
+  updateVariant,
+} from "./serverActions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,18 +21,6 @@ async function getCurrentUser() {
     }
   }
   return null;
-}
-
-async function assertOwner() {
-  const requireOwner = (rbac as any).requireOwner;
-  if (typeof requireOwner === "function") {
-    await requireOwner();
-    return;
-  }
-
-  const user = await getCurrentUser();
-  const role = String(user?.role ?? "").toUpperCase();
-  if (role !== "OWNER") throw new Error("غير مصرح");
 }
 
 function formatEGP(value: number) {
@@ -62,121 +56,6 @@ function stockMeta(qty: number) {
   };
 }
 
-async function addVariantAction(formData: FormData) {
-  "use server";
-
-  await assertOwner();
-
-  const modelName = String(formData.get("modelName") ?? "").trim();
-  const brand = String(formData.get("brand") ?? "").trim();
-  const grade = String(formData.get("grade") ?? "MIRROR").trim() as
-    | "ORIGINAL"
-    | "MIRROR"
-    | "EGYPTIAN";
-  const sellPrice = Number(formData.get("sellPrice") ?? 0);
-  const costPrice = Number(formData.get("costPrice") ?? 0);
-  const stockQty = Number(formData.get("stockQty") ?? 0);
-  const size = String(formData.get("size") ?? "").trim() || null;
-  const sku = String(formData.get("sku") ?? "").trim() || null;
-  const color = String(formData.get("color") ?? "").trim() || null;
-  const isActive = String(formData.get("isActive") ?? "on") === "on";
-
-  if (!modelName) return;
-
-  let model = await prisma.productModel.findFirst({
-    where: {
-      name: modelName,
-      brand: brand || null,
-    },
-  });
-
-  if (!model) {
-    model = await prisma.productModel.create({
-      data: {
-        name: modelName,
-        brand: brand || null,
-      },
-    });
-  }
-
-  await prisma.productVariant.create({
-    data: {
-      modelId: model.id,
-      grade,
-      size,
-      color,
-      sku,
-      sellPrice: Math.max(0, Math.trunc(sellPrice)),
-      costPrice: Math.max(0, Math.trunc(costPrice)),
-      stockQty: Math.max(0, Math.trunc(stockQty)),
-      isActive,
-    },
-  });
-
-  revalidatePath("/products");
-}
-
-async function restockAction(formData: FormData) {
-  "use server";
-
-  await assertOwner();
-
-  const variantId = String(formData.get("variantId") ?? "");
-  const qty = Math.max(0, Math.trunc(Number(formData.get("restockQty") ?? 0)));
-
-  if (!variantId || qty <= 0) return;
-
-  await prisma.productVariant.update({
-    where: { id: variantId },
-    data: {
-      stockQty: {
-        increment: qty,
-      },
-    },
-  });
-
-  revalidatePath("/products");
-}
-
-async function toggleActiveAction(formData: FormData) {
-  "use server";
-
-  await assertOwner();
-
-  const variantId = String(formData.get("variantId") ?? "");
-  const nextActive = String(formData.get("nextActive") ?? "false") === "true";
-
-  if (!variantId) return;
-
-  await prisma.productVariant.update({
-    where: { id: variantId },
-    data: {
-      isActive: nextActive,
-    },
-  });
-
-  revalidatePath("/products");
-}
-
-async function deleteVariantAction(formData: FormData) {
-  "use server";
-
-  await assertOwner();
-
-  const variantId = String(formData.get("variantId") ?? "");
-  if (!variantId) return;
-
-  await prisma.productVariant.update({
-    where: { id: variantId },
-    data: {
-      isActive: false,
-      stockQty: 0,
-    },
-  });
-
-  revalidatePath("/products");
-}
-
 export default async function ProductsPage({
   searchParams,
 }: {
@@ -187,7 +66,7 @@ export default async function ProductsPage({
   const isOwner = role === "OWNER";
 
   const sp = await Promise.resolve(
-    searchParams ?? Promise.resolve({} as { q?: string }),
+    searchParams ?? Promise.resolve({} as { q?: string })
   );
   const q = String(sp.q ?? "").trim().toLowerCase();
 
@@ -281,7 +160,7 @@ export default async function ProductsPage({
               </p>
             </div>
 
-            <form action={addVariantAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <form action={createVariant} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <input
                 name="modelName"
                 placeholder="اسم الموديل"
@@ -341,16 +220,6 @@ export default async function ProductsPage({
                 className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
               />
 
-              <label className="flex h-12 items-center justify-between rounded-2xl border border-white/10 bg-black/40 px-4 text-sm">
-                <span>تفعيل القطعة</span>
-                <input
-                  name="isActive"
-                  type="checkbox"
-                  defaultChecked
-                  className="h-4 w-4 accent-red-600"
-                />
-              </label>
-
               <div className="md:col-span-2 xl:col-span-2">
                 <button className="h-12 w-full rounded-2xl bg-red-600 text-sm font-extrabold transition hover:bg-red-500">
                   حفظ القطعة
@@ -362,11 +231,11 @@ export default async function ProductsPage({
 
         <section className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03]">
           <div className="border-b border-white/10 px-5 py-4">
-            <h2 className="text-lg font-extrabold">قائمة القطعة</h2>
+            <h2 className="text-lg font-extrabold">قائمة القطع</h2>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[1350px] w-full text-right">
+            <table className="min-w-[1500px] w-full text-right">
               <thead className="bg-white/[0.03] text-sm text-white/70">
                 <tr>
                   <th className="px-4 py-4">الموديل</th>
@@ -380,7 +249,7 @@ export default async function ProductsPage({
                   <th className="px-4 py-4">SKU</th>
                   <th className="px-4 py-4">الحالة</th>
                   <th className="px-4 py-4">التنبيه</th>
-                  {isOwner ? <th className="px-4 py-4">إجراءات</th> : null}
+                  {isOwner ? <th className="px-4 py-4">إدارة</th> : null}
                 </tr>
               </thead>
 
@@ -432,11 +301,77 @@ export default async function ProductsPage({
 
                         {isOwner ? (
                           <td className="px-4 py-4">
-                            <div className="flex min-w-[250px] flex-col gap-3">
-                              <form action={restockAction} className="flex gap-2">
+                            <div className="flex min-w-[420px] flex-col gap-3">
+                              <form action={updateVariant} className="grid gap-2 rounded-2xl border border-white/10 bg-black/30 p-3">
                                 <input type="hidden" name="variantId" value={row.id} />
+
+                                <div className="grid gap-2 md:grid-cols-2">
+                                  <input
+                                    name="modelName"
+                                    defaultValue={row.model.name}
+                                    placeholder="اسم الموديل"
+                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
+                                  />
+                                  <input
+                                    name="brand"
+                                    defaultValue={row.model.brand ?? ""}
+                                    placeholder="البراند"
+                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
+                                  />
+                                  <select
+                                    name="grade"
+                                    defaultValue={row.grade}
+                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
+                                  >
+                                    <option value="ORIGINAL" className="bg-black">ORIGINAL</option>
+                                    <option value="MIRROR" className="bg-black">MIRROR</option>
+                                    <option value="EGYPTIAN" className="bg-black">EGYPTIAN</option>
+                                  </select>
+                                  <input
+                                    name="sku"
+                                    defaultValue={row.sku ?? ""}
+                                    placeholder="SKU"
+                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
+                                  />
+                                  <input
+                                    name="sellPrice"
+                                    type="number"
+                                    min="0"
+                                    defaultValue={row.sellPrice}
+                                    placeholder="سعر البيع"
+                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
+                                  />
+                                  <input
+                                    name="costPrice"
+                                    type="number"
+                                    min="0"
+                                    defaultValue={row.costPrice}
+                                    placeholder="سعر التكلفة"
+                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
+                                  />
+                                  <input
+                                    name="size"
+                                    defaultValue={row.size ?? ""}
+                                    placeholder="المقاس"
+                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
+                                  />
+                                  <input
+                                    name="color"
+                                    defaultValue={row.color ?? ""}
+                                    placeholder="اللون"
+                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
+                                  />
+                                </div>
+
+                                <button className="h-10 rounded-xl bg-red-600 px-4 text-xs font-extrabold hover:bg-red-500">
+                                  حفظ التعديل
+                                </button>
+                              </form>
+
+                              <form action={restockVariant} className="flex gap-2">
+                                <input type="hidden" name="id" value={row.id} />
                                 <input
-                                  name="restockQty"
+                                  name="qty"
                                   type="number"
                                   min="1"
                                   placeholder="إضافة كمية"
@@ -448,9 +383,9 @@ export default async function ProductsPage({
                               </form>
 
                               <div className="flex flex-wrap gap-2">
-                                <form action={toggleActiveAction}>
-                                  <input type="hidden" name="variantId" value={row.id} />
-                                  <input type="hidden" name="nextActive" value={String(!row.isActive)} />
+                                <form action={toggleVariantActive}>
+                                  <input type="hidden" name="id" value={row.id} />
+                                  <input type="hidden" name="next" value={row.isActive ? "0" : "1"} />
                                   <button
                                     className={`h-10 rounded-xl px-4 text-xs font-bold ${
                                       row.isActive
@@ -462,8 +397,8 @@ export default async function ProductsPage({
                                   </button>
                                 </form>
 
-                                <form action={deleteVariantAction}>
-                                  <input type="hidden" name="variantId" value={row.id} />
+                                <form action={deleteVariant}>
+                                  <input type="hidden" name="id" value={row.id} />
                                   <button className="h-10 rounded-xl bg-red-600/20 px-4 text-xs font-bold text-red-200 hover:bg-red-600/30">
                                     تعطيل
                                   </button>

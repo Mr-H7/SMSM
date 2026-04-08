@@ -3,6 +3,14 @@ import { prisma } from "@/lib/prisma";
 import * as rbac from "@/lib/rbac";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import {
+  formatCairoDate,
+  formatCairoDateTime,
+  getCairoDayRange,
+  getCairoNow,
+  getShiftAutoCloseLabel,
+  isAfterShiftAutoClose,
+} from "@/lib/cairo-time";
 
 export const dynamic = "force-dynamic";
 
@@ -51,17 +59,12 @@ function formatEGP(value: number) {
   }).format(Number.isFinite(value) ? value : 0);
 }
 
-function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const today = startOfToday();
+  const todayRange = getCairoDayRange();
+  const cairoNow = getCairoNow();
 
   const [productsCount, lowStockCount, todaySales, todayReturns, usersCount, invoicesCount] =
     await Promise.all([
@@ -76,14 +79,17 @@ export default async function DashboardPage() {
       prisma.sale.findMany({
         where: {
           createdAt: {
-            gte: today,
+            gte: todayRange.start,
+            lt: todayRange.end,
           },
         },
+        orderBy: { createdAt: "desc" },
       }),
       prisma.saleReturn.findMany({
         where: {
           createdAt: {
-            gte: today,
+            gte: todayRange.start,
+            lt: todayRange.end,
           },
         },
       }),
@@ -97,6 +103,8 @@ export default async function DashboardPage() {
 
   const role = String(user.role ?? user.userRole ?? "").toUpperCase();
   const isOwner = role === "OWNER";
+  const lastInvoice = todaySales[0] ?? null;
+  const afterAutoClose = isAfterShiftAutoClose();
 
   return (
     <main dir="rtl" className="min-h-screen bg-black text-white">
@@ -127,6 +135,12 @@ export default async function DashboardPage() {
                 className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
               >
                 المرتجعات
+              </Link>
+              <Link
+                href="/shift-close"
+                className="inline-flex h-12 items-center rounded-2xl border border-red-500/30 bg-red-600/15 px-5 text-sm font-extrabold text-red-200 transition hover:bg-red-600/25"
+              >
+                إنهاء الشيفت
               </Link>
 
               {isOwner ? (
@@ -172,6 +186,16 @@ export default async function DashboardPage() {
         </section>
 
         <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-5">
+            <div className="text-sm text-cyan-100/80">الوقت الحالي</div>
+            <div className="mt-3 text-xl font-black text-cyan-200">
+              {formatCairoDateTime(new Date())}
+            </div>
+            <div className="mt-2 text-sm text-cyan-100/60">
+              توقيت القاهرة
+            </div>
+          </div>
+
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
             <div className="text-sm text-white/60">مبيعات اليوم</div>
             <div className="mt-3 text-3xl font-black">{todaySales.length}</div>
@@ -191,11 +215,35 @@ export default async function DashboardPage() {
             <div className="mt-3 text-3xl font-black text-yellow-300">{lowStockCount}</div>
             <div className="mt-2 text-sm text-yellow-100/60">من 1 إلى 7</div>
           </div>
+        </section>
 
+        <section className="mb-8 grid gap-4 md:grid-cols-2">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="text-sm text-white/60">إجمالي المنتجات</div>
-            <div className="mt-3 text-3xl font-black">{productsCount}</div>
-            <div className="mt-2 text-sm text-white/50">عدد النسخ الموجودة في النظام</div>
+            <div className="text-sm text-white/60">تاريخ اليوم التشغيلي</div>
+            <div className="mt-3 text-2xl font-black">{formatCairoDate(new Date())}</div>
+            <div className="mt-2 text-sm text-white/50">
+              جميع الحسابات المعروضة هنا مبنية على توقيت القاهرة
+            </div>
+          </div>
+
+          <div
+            className={`rounded-3xl border p-5 ${
+              afterAutoClose
+                ? "border-red-500/30 bg-red-600/10"
+                : "border-emerald-500/20 bg-emerald-500/10"
+            }`}
+          >
+            <div className="text-sm">
+              {afterAutoClose ? "تنبيه الشيفت" : "حالة الشيفت"}
+            </div>
+            <div className="mt-3 text-2xl font-black">
+              {afterAutoClose
+                ? `تم تجاوز وقت الإغلاق التلقائي (${getShiftAutoCloseLabel()})`
+                : `الشيفت مفتوح حتى ${getShiftAutoCloseLabel()}`}
+            </div>
+            <div className="mt-2 text-sm opacity-80">
+              يمكنك الدخول إلى صفحة إنهاء الشيفت لإنهاء اليوم ومراجعة الملخص.
+            </div>
           </div>
         </section>
 
@@ -223,6 +271,12 @@ export default async function DashboardPage() {
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
                 <span className="text-white/70">مرتجعات اليوم</span>
                 <span className="text-xl font-black">{todayReturns.length}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
+                <span className="text-white/70">آخر فاتورة اليوم</span>
+                <span className="text-sm font-black">
+                  {lastInvoice ? formatCairoDateTime(lastInvoice.createdAt) : "-"}
+                </span>
               </div>
             </div>
           </section>
@@ -290,6 +344,16 @@ export default async function DashboardPage() {
                   <div className="text-lg font-extrabold">عرض الفواتير</div>
                   <div className="mt-2 text-sm text-white/55">
                     تفاصيل الفواتير والطباعة والمتابعة.
+                  </div>
+                </Link>
+
+                <Link
+                  href="/shift-close"
+                  className="rounded-2xl border border-red-500/30 bg-red-600/10 p-5 transition hover:border-red-500/50 hover:bg-red-600/15"
+                >
+                  <div className="text-lg font-extrabold">إنهاء الشيفت</div>
+                  <div className="mt-2 text-sm text-white/70">
+                    مراجعة ملخص اليوم وإنهاء الشيفت يدويًا.
                   </div>
                 </Link>
 
