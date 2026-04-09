@@ -27,11 +27,26 @@ async function requireUser() {
   return user;
 }
 
+function normalizePaymentMethod(raw: string): "CASH" | "TRANSFER" {
+  const value = raw.trim().toUpperCase();
+  return value === "TRANSFER" ? "TRANSFER" : "CASH";
+}
+
 export async function createSale(formData: FormData) {
   const user = await requireUser();
 
   const customer = normalizeText(formData.get("customer")) || null;
   const discount = parseIntSafe(formData.get("discount"), 0);
+
+  const paymentMethod = normalizePaymentMethod(
+    normalizeText(formData.get("paymentMethod"))
+  );
+  const paymentDescription =
+    normalizeText(formData.get("paymentDescription")) || null;
+
+  if (paymentMethod === "TRANSFER" && !paymentDescription) {
+    throw new Error("تفاصيل التحويل مطلوبة عند اختيار طريقة الدفع تحويل");
+  }
 
   const itemsJson = normalizeText(formData.get("itemsJson"));
   if (!itemsJson) throw new Error("السلة فاضية");
@@ -115,6 +130,9 @@ export async function createSale(formData: FormData) {
           customer,
           total,
           discount: safeDiscount,
+          paymentMethod: paymentMethod as "CASH" | "TRANSFER",
+          paymentDescription:
+            paymentMethod === "TRANSFER" ? paymentDescription : null,
         },
         select: { id: true },
       });

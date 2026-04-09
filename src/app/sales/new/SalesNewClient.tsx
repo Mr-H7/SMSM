@@ -20,6 +20,8 @@ type CartItem = {
   qty: number;
 };
 
+type PaymentMethod = "CASH" | "TRANSFER";
+
 export default function SalesNewClient({
   variants,
 }: {
@@ -30,6 +32,8 @@ export default function SalesNewClient({
 
   const [customer, setCustomer] = useState("");
   const [discount, setDiscount] = useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
+  const [paymentDescription, setPaymentDescription] = useState("");
 
   const [query, setQuery] = useState("");
   const [exactPrice, setExactPrice] = useState<string>("");
@@ -119,9 +123,16 @@ export default function SalesNewClient({
       return;
     }
 
+    if (paymentMethod === "TRANSFER" && !paymentDescription.trim()) {
+      setError("اكتب تفاصيل التحويل");
+      return;
+    }
+
     const fd = new FormData();
     fd.set("customer", customer);
     fd.set("discount", String(discount || 0));
+    fd.set("paymentMethod", paymentMethod);
+    fd.set("paymentDescription", paymentDescription);
     fd.set("itemsJson", JSON.stringify(cart));
 
     startTransition(async () => {
@@ -283,6 +294,50 @@ export default function SalesNewClient({
                 />
               </div>
 
+              <div className="md:col-span-12">
+                <label className="mb-2 block text-sm text-white/70">طريقة الدفع</label>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("CASH")}
+                    className={`rounded-xl px-4 py-3 text-sm font-bold transition ${
+                      paymentMethod === "CASH"
+                        ? "bg-red-600 text-white"
+                        : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    }`}
+                  >
+                    كاش
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("TRANSFER")}
+                    className={`rounded-xl px-4 py-3 text-sm font-bold transition ${
+                      paymentMethod === "TRANSFER"
+                        ? "bg-red-600 text-white"
+                        : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    }`}
+                  >
+                    تحويل
+                  </button>
+                </div>
+              </div>
+
+              {paymentMethod === "TRANSFER" ? (
+                <div className="md:col-span-12">
+                  <label className="mb-1 block text-sm text-white/70">
+                    تفاصيل التحويل
+                  </label>
+                  <textarea
+                    value={paymentDescription}
+                    onChange={(e) => setPaymentDescription(e.target.value)}
+                    rows={3}
+                    placeholder="مثال: تحويل إنستاباي / فودافون كاش / رقم العملية / اسم المحول"
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
+                  />
+                </div>
+              ) : null}
+
               {error && (
                 <div className="md:col-span-12 rounded-xl border border-red-500/30 bg-red-600/10 p-3 text-sm text-red-300">
                   {error}
@@ -317,6 +372,18 @@ export default function SalesNewClient({
 
             <div className="mt-3 text-sm text-white/60">Total</div>
             <div className="mt-1 text-3xl font-extrabold text-red-500">{total}</div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3 text-sm">
+              <div className="text-white/60">طريقة الدفع المختارة</div>
+              <div className="mt-1 font-extrabold">
+                {paymentMethod === "CASH" ? "كاش" : "تحويل"}
+              </div>
+              {paymentMethod === "TRANSFER" && paymentDescription.trim() ? (
+                <div className="mt-2 break-words text-xs text-white/60">
+                  {paymentDescription}
+                </div>
+              ) : null}
+            </div>
 
             <div className="mt-3 text-xs text-white/40">
               (Profit/Cost not shown to sellers — server keeps cost snapshot only)

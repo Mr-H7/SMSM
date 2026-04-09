@@ -6,6 +6,7 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 enum Role {
   OWNER
   SELLER
@@ -20,6 +21,11 @@ enum VariantGrade {
 enum ReturnType {
   REFUND
   EXCHANGE
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
 }
 
 model User {
@@ -68,16 +74,18 @@ model ProductVariant {
 }
 
 model Sale {
-  id          String       @id @default(cuid())
-  sellerId    String
-  customer    String?
-  total       Int
-  discount    Int          @default(0)
-  createdAt   DateTime     @default(now())
+  id                 String        @id @default(cuid())
+  sellerId           String
+  customer           String?
+  total              Int
+  discount           Int           @default(0)
+  paymentMethod      PaymentMethod @default(CASH)
+  paymentDescription String?
+  createdAt          DateTime      @default(now())
 
-  seller      User         @relation(fields: [sellerId], references: [id], onDelete: Restrict)
-  items       SaleItem[]
-  returns     SaleReturn[]
+  seller             User          @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  items              SaleItem[]
+  returns            SaleReturn[]
 }
 
 model SaleItem {
