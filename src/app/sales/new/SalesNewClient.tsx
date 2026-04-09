@@ -207,7 +207,7 @@ export default function SalesNewClient({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto">
+        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-4">
           <table className="w-full min-w-[1150px] border-collapse text-right text-sm">
             <thead>
               <tr className="border-b border-white/10 text-white/70">
@@ -232,7 +232,9 @@ export default function SalesNewClient({
                 </tr>
               ) : (
                 filtered.map((v) => {
-                  const name = v.model.brand ? `${v.model.brand} ${v.model.name}` : v.model.name;
+                  const name = v.model.brand
+                    ? `${v.model.brand} ${v.model.name}`
+                    : v.model.name;
                   const qty = cartMap.get(v.id) ?? 0;
 
                   return (
@@ -276,7 +278,9 @@ export default function SalesNewClient({
           <div className="md:col-span-7 rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="grid gap-3 md:grid-cols-12">
               <div className="md:col-span-6">
-                <label className="mb-1 block text-sm text-white/70">اسم العميل (اختياري)</label>
+                <label className="mb-1 block text-sm text-white/70">
+                  اسم العميل (اختياري)
+                </label>
                 <input
                   value={customer}
                   onChange={(e) => setCustomer(e.target.value)}
@@ -295,32 +299,15 @@ export default function SalesNewClient({
               </div>
 
               <div className="md:col-span-12">
-                <label className="mb-2 block text-sm text-white/70">طريقة الدفع</label>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("CASH")}
-                    className={`rounded-xl px-4 py-3 text-sm font-bold transition ${
-                      paymentMethod === "CASH"
-                        ? "bg-red-600 text-white"
-                        : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-                    }`}
-                  >
-                    كاش
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("TRANSFER")}
-                    className={`rounded-xl px-4 py-3 text-sm font-bold transition ${
-                      paymentMethod === "TRANSFER"
-                        ? "bg-red-600 text-white"
-                        : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-                    }`}
-                  >
-                    تحويل
-                  </button>
-                </div>
+                <label className="mb-1 block text-sm text-white/70">طريقة الدفع</label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
+                >
+                  <option value="CASH">كاش</option>
+                  <option value="TRANSFER">تحويل</option>
+                </select>
               </div>
 
               {paymentMethod === "TRANSFER" ? (
@@ -332,7 +319,7 @@ export default function SalesNewClient({
                     value={paymentDescription}
                     onChange={(e) => setPaymentDescription(e.target.value)}
                     rows={3}
-                    placeholder="مثال: تحويل إنستاباي / فودافون كاش / رقم العملية / اسم المحول"
+                    placeholder="مثال: إنستاباي / فودافون كاش / رقم العملية / اسم المحول"
                     className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
                   />
                 </div>
