@@ -242,7 +242,7 @@ export default async function ProductsPage({
                   <th className="px-4 py-4">البراند</th>
                   <th className="px-4 py-4">الدرجة</th>
                   <th className="px-4 py-4">البيع</th>
-                  <th className="px-4 py-4">التكلفة</th>
+                  {isOwner ? <th className="px-4 py-4">التكلفة</th> : null}
                   <th className="px-4 py-4">المخزون</th>
                   <th className="px-4 py-4">المقاس</th>
                   <th className="px-4 py-4">اللون</th>
@@ -257,7 +257,7 @@ export default async function ProductsPage({
                 {rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={isOwner ? 12 : 11}
+                      colSpan={isOwner ? 12 : 10}
                       className="px-4 py-16 text-center text-sm text-white/45"
                     >
                       لا توجد منتجات مطابقة.
@@ -277,7 +277,9 @@ export default async function ProductsPage({
                           </span>
                         </td>
                         <td className="px-4 py-4 text-white/90">{formatEGP(row.sellPrice)}</td>
-                        <td className="px-4 py-4 text-white/60">{formatEGP(row.costPrice)}</td>
+                        {isOwner ? (
+                          <td className="px-4 py-4 text-white/60">{formatEGP(row.costPrice)}</td>
+                        ) : null}
                         <td className="px-4 py-4 text-lg font-black">{row.stockQty}</td>
                         <td className="px-4 py-4 text-white/80">{row.size ?? "-"}</td>
                         <td className="px-4 py-4 text-white/80">{row.color ?? "-"}</td>

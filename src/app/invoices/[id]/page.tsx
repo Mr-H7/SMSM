@@ -197,6 +197,22 @@ export default async function InvoiceDetailsPage({
                 {sale.seller?.fullName || sale.seller?.username || "-"}
               </span>
             </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-neutral-500">طريقة الدفع</span>
+              <span className="font-bold">
+                {sale.paymentMethod === "TRANSFER" ? "تحويل" : "كاش"}
+              </span>
+            </div>
+
+            {sale.paymentMethod === "TRANSFER" && sale.paymentDescription ? (
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-neutral-500 shrink-0">تفاصيل التحويل</span>
+                <span className="font-bold text-left break-all max-w-[180px]">
+                  {sale.paymentDescription}
+                </span>
+              </div>
+            ) : null}
           </div>
 
           <div className="px-4 py-4">
