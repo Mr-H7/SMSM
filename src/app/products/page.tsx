@@ -1,6 +1,7 @@
 import Link from "next/link";
+import CommandShell from "@/components/CommandShell";
 import { prisma } from "@/lib/prisma";
-import * as rbac from "@/lib/rbac";
+import { requireUser } from "@/lib/rbac";
 import {
   createVariant,
   deleteVariant,
@@ -11,20 +12,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-async function getCurrentUser() {
-  const requireUser = (rbac as any).requireUser;
-  if (typeof requireUser === "function") {
-    try {
-      return await requireUser();
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
 function formatEGP(value: number) {
-  return new Intl.NumberFormat("ar-EG", {
+  return new Intl.NumberFormat("en-EG", {
     style: "currency",
     currency: "EGP",
     maximumFractionDigits: 0,
@@ -34,51 +23,64 @@ function formatEGP(value: number) {
 function stockMeta(qty: number) {
   if (qty <= 0) {
     return {
-      label: "نفد",
-      cls: "bg-red-600/20 text-red-300 border-red-500/40",
+      label: "Out",
+      dot: "bg-[var(--primary)]",
+      badge: "bg-[var(--primary)]/15 text-[var(--primary-soft)]",
     };
   }
   if (qty <= 2) {
     return {
-      label: "حرج",
-      cls: "bg-orange-500/20 text-orange-200 border-orange-400/40",
+      label: "Critical",
+      dot: "bg-[var(--primary)]",
+      badge: "bg-[var(--primary)]/15 text-[var(--primary-soft)]",
     };
   }
   if (qty <= 5) {
     return {
-      label: "منخفض",
-      cls: "bg-yellow-500/20 text-yellow-200 border-yellow-400/40",
+      label: "Low",
+      dot: "bg-[#ffb4aa]",
+      badge: "bg-[#ffb4aa]/12 text-[#ffb4aa]",
     };
   }
   return {
-    label: "جيد",
-    cls: "bg-emerald-500/20 text-emerald-200 border-emerald-400/40",
+    label: "Healthy",
+    dot: "bg-[var(--tertiary)]",
+    badge: "bg-[var(--tertiary)]/12 text-[var(--tertiary)]",
   };
+}
+
+function swatchText(value: string | null | undefined) {
+  return (value || "PR").slice(0, 2).toUpperCase();
 }
 
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string }>;
+  searchParams?: Promise<{ q?: string; grade?: string; status?: string }>;
 }) {
-  const user = await getCurrentUser();
+  const user = await requireUser();
   const role = String(user?.role ?? "").toUpperCase();
   const isOwner = role === "OWNER";
 
   const sp = await Promise.resolve(
-    searchParams ?? Promise.resolve({} as { q?: string })
+    searchParams ?? Promise.resolve({} as { q?: string; grade?: string; status?: string })
   );
   const q = String(sp.q ?? "").trim().toLowerCase();
+  const gradeFilter = String(sp.grade ?? "").trim().toUpperCase();
+  const statusFilter = String(sp.status ?? "").trim().toLowerCase();
 
   const variants = await prisma.productVariant.findMany({
     orderBy: [{ updatedAt: "desc" }],
-    include: {
-      model: true,
-    },
+    include: { model: true },
   });
 
-  const rows = variants.filter((row) => {
+  const searchedRows = variants.filter((row) => {
+    if (gradeFilter && row.grade !== gradeFilter) return false;
+    if (statusFilter === "low" && row.stockQty > 5) return false;
+    if (statusFilter === "out" && row.stockQty > 0) return false;
+    if (statusFilter === "inactive" && row.isActive) return false;
     if (!q) return true;
+
     return [
       row.model.name,
       row.model.brand ?? "",
@@ -92,317 +94,261 @@ export default async function ProductsPage({
       .includes(q);
   });
 
-  const totalVariants = rows.length;
-  const totalStock = rows.reduce((sum, row) => sum + row.stockQty, 0);
-  const inactiveCount = rows.filter((row) => !row.isActive).length;
-  const alertCount = rows.filter((row) => row.stockQty <= 5).length;
+  const totalVariants = searchedRows.length;
+  const totalStock = searchedRows.reduce((sum, row) => sum + row.stockQty, 0);
+  const inactiveCount = searchedRows.filter((row) => !row.isActive).length;
+  const alertCount = searchedRows.filter((row) => row.stockQty <= 5).length;
+  const prices = searchedRows.map((row) => row.sellPrice).filter((price) => Number.isFinite(price));
+  const minPrice = prices.length ? Math.min(...prices) : 0;
+  const maxPrice = prices.length ? Math.max(...prices) : 0;
+
+  const gradeCounts = ["ORIGINAL", "MIRROR", "EGYPTIAN"].map((grade) => ({
+    grade,
+    count: variants.filter((row) => row.grade === grade).length,
+  }));
 
   return (
-    <main dir="rtl" className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="mb-6">
-          <Link
-            href="/dashboard"
-            className="inline-flex h-11 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold text-white transition hover:bg-white/10"
-          >
-            رجوع
-          </Link>
-        </div>
-
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <CommandShell active="products" user={user}>
+      <div className="mx-auto max-w-7xl space-y-8">
+        <section className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight">المنتجات والمخزون</h1>
-            <p className="mt-2 text-sm text-white/60">
-              متابعة كاملة لكل الفاريانتات وحالة المخزون والحركة التشغيلية.
+            <div className="command-label">Global stock command</div>
+            <h1 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">
+              Inventory Hub
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-white/55">
+              Manage product variants, stock signals, pricing, activity status, and restock operations with live SMSM data.
             </p>
           </div>
 
-          <form method="GET" className="w-full max-w-xl">
-            <div className="flex gap-3">
-              <input
-                name="q"
-                defaultValue={q}
-                placeholder="ابحث بالموديل أو البراند أو المقاس أو SKU"
-                className="h-12 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-              <button className="h-12 rounded-2xl bg-red-600 px-6 text-sm font-bold transition hover:bg-red-500">
-                بحث
-              </button>
-            </div>
-          </form>
-        </div>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/dashboard" className="command-secondary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
+              Dashboard
+            </Link>
+            {isOwner ? (
+              <a href="#new-product" className="command-primary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
+                Add Product
+              </a>
+            ) : null}
+          </div>
+        </section>
 
-        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-            <div className="text-sm text-white/60">إجمالي الفاريانتات</div>
-            <div className="mt-3 text-3xl font-black">{totalVariants}</div>
+        <form method="GET" className="command-panel-high grid gap-3 p-4 lg:grid-cols-12">
+          <div className="lg:col-span-6">
+            <label className="command-label mb-2 block">Search</label>
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="Product, brand, SKU, size, color..."
+              className="command-input h-12 w-full px-4 text-sm placeholder:text-white/30"
+            />
           </div>
-          <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5">
-            <div className="text-sm text-emerald-100/80">إجمالي القطع بالمخزون</div>
-            <div className="mt-3 text-3xl font-black text-emerald-300">{totalStock}</div>
+          <div className="lg:col-span-3">
+            <label className="command-label mb-2 block">Grade</label>
+            <select name="grade" defaultValue={gradeFilter} className="command-input h-12 w-full px-4 text-sm">
+              <option value="" className="bg-[#201f1f]">All Grades</option>
+              <option value="ORIGINAL" className="bg-[#201f1f]">ORIGINAL</option>
+              <option value="MIRROR" className="bg-[#201f1f]">MIRROR</option>
+              <option value="EGYPTIAN" className="bg-[#201f1f]">EGYPTIAN</option>
+            </select>
           </div>
-          <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-5">
-            <div className="text-sm text-yellow-100/80">تنبيهات المخزون</div>
-            <div className="mt-3 text-3xl font-black text-yellow-300">{alertCount}</div>
+          <div className="lg:col-span-2">
+            <label className="command-label mb-2 block">Status</label>
+            <select name="status" defaultValue={statusFilter} className="command-input h-12 w-full px-4 text-sm">
+              <option value="" className="bg-[#201f1f]">All</option>
+              <option value="low" className="bg-[#201f1f]">Low Stock</option>
+              <option value="out" className="bg-[#201f1f]">Out of Stock</option>
+              <option value="inactive" className="bg-[#201f1f]">Inactive</option>
+            </select>
           </div>
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-            <div className="text-sm text-white/60">غير النشط</div>
-            <div className="mt-3 text-3xl font-black">{inactiveCount}</div>
+          <div className="flex items-end lg:col-span-1">
+            <button className="command-primary h-12 w-full text-xs font-black uppercase tracking-[0.12em]">
+              Filter
+            </button>
           </div>
-        </div>
+        </form>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="command-card border-l-4 border-[var(--primary)] p-4">
+            <div className="command-label">Variants</div>
+            <div className="mt-3 text-3xl font-black text-white">{totalVariants}</div>
+            <div className="mt-2 text-xs text-white/45">Visible after current filters</div>
+          </div>
+          <div className="command-card border-l-4 border-[var(--tertiary)] p-4">
+            <div className="command-label">Total Stock</div>
+            <div className="mt-3 text-3xl font-black text-white">{totalStock}</div>
+            <div className="mt-2 text-xs text-white/45">Units available in matching rows</div>
+          </div>
+          <div className="command-card border-l-4 border-[var(--primary)] p-4">
+            <div className="command-label">Stock Alerts</div>
+            <div className="mt-3 text-3xl font-black text-white">{alertCount}</div>
+            <div className="mt-2 text-xs text-white/45">Rows at 5 units or less</div>
+          </div>
+          <div className="command-card p-4">
+            <div className="command-label">Price Range</div>
+            <div className="mt-3 text-xl font-black text-white">
+              {formatEGP(minPrice)} - {formatEGP(maxPrice)}
+            </div>
+            <div className="mt-2 text-xs text-white/45">{inactiveCount} inactive variants</div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-3">
+          {gradeCounts.map((item, index) => (
+            <Link
+              key={item.grade}
+              href={`/products?grade=${item.grade}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              className={`command-panel p-4 transition hover:bg-white/[0.045] ${
+                index === 0 ? "border-l-4 border-[var(--primary)]" : "border-l-4 border-[var(--surface-highest)]"
+              }`}
+            >
+              <div className="command-label">Grade Filter</div>
+              <div className="mt-2 flex items-end justify-between gap-4">
+                <div className="text-lg font-black text-white">{item.grade}</div>
+                <div className="text-2xl font-black text-white">{item.count}</div>
+              </div>
+            </Link>
+          ))}
+        </section>
 
         {isOwner ? (
-          <section className="mb-8 rounded-[28px] border border-red-500/20 bg-gradient-to-b from-red-950/30 to-white/[0.03] p-5">
+          <section id="new-product" className="command-panel-high p-5">
             <div className="mb-5">
-              <h2 className="text-xl font-extrabold">إضافة فاريانت جديد</h2>
-              <p className="mt-1 text-sm text-white/55">
-                أدخل القطعة الجديدة. اللون اختياري للتنظيم والعرض.
-              </p>
+              <div className="command-label">Owner operation</div>
+              <h2 className="mt-2 text-xl font-black uppercase tracking-tight text-white">
+                Add New Variant
+              </h2>
             </div>
 
-            <form action={createVariant} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <input
-                name="modelName"
-                placeholder="اسم الموديل"
-                required
-                className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-              <input
-                name="brand"
-                placeholder="البراند"
-                className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-              <select
-                name="grade"
-                defaultValue="MIRROR"
-                className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none focus:border-red-500/60"
-              >
-                <option value="ORIGINAL" className="bg-black">ORIGINAL</option>
-                <option value="MIRROR" className="bg-black">MIRROR</option>
-                <option value="EGYPTIAN" className="bg-black">EGYPTIAN</option>
+            <form action={createVariant} className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <input name="modelName" placeholder="Model name" required className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <input name="brand" placeholder="Brand" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <select name="grade" defaultValue="MIRROR" className="command-input h-12 px-4 text-sm">
+                <option value="ORIGINAL" className="bg-[#201f1f]">ORIGINAL</option>
+                <option value="MIRROR" className="bg-[#201f1f]">MIRROR</option>
+                <option value="EGYPTIAN" className="bg-[#201f1f]">EGYPTIAN</option>
               </select>
-              <input
-                name="sku"
-                placeholder="SKU / كود"
-                className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-              <input
-                name="sellPrice"
-                type="number"
-                step="1"
-                min="0"
-                placeholder="سعر البيع"
-                className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-              <input
-                name="costPrice"
-                type="number"
-                step="1"
-                min="0"
-                placeholder="سعر التكلفة"
-                className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-              <input
-                name="stockQty"
-                type="number"
-                min="0"
-                placeholder="الكمية"
-                className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-              <input
-                name="size"
-                placeholder="المقاس"
-                className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-              <input
-                name="color"
-                placeholder="اللون (اختياري)"
-                className="h-12 rounded-2xl border border-white/10 bg-black/40 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-
-              <div className="md:col-span-2 xl:col-span-2">
-                <button className="h-12 w-full rounded-2xl bg-red-600 text-sm font-extrabold transition hover:bg-red-500">
-                  حفظ القطعة
-                </button>
-              </div>
+              <input name="sku" placeholder="SKU" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <input name="sellPrice" type="number" step="1" min="0" placeholder="Sell price" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <input name="costPrice" type="number" step="1" min="0" placeholder="Cost price" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <input name="stockQty" type="number" min="0" placeholder="Stock qty" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <input name="size" placeholder="Size" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <input name="color" placeholder="Color" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <button className="command-primary h-12 text-xs font-black uppercase tracking-[0.12em]">Save Variant</button>
             </form>
           </section>
         ) : null}
 
-        <section className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03]">
-          <div className="border-b border-white/10 px-5 py-4">
-            <h2 className="text-lg font-extrabold">قائمة القطع</h2>
+        <section className="command-panel overflow-hidden">
+          <div className="flex flex-col gap-2 bg-[var(--surface-lowest)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="command-label">Product register</div>
+              <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">Stock Matrix</h2>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/42">
+              Showing {searchedRows.length} of {variants.length} variants
+            </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[1500px] w-full text-right">
-              <thead className="bg-white/[0.03] text-sm text-white/70">
+            <table className="command-table min-w-[1280px] text-left text-sm">
+              <thead>
                 <tr>
-                  <th className="px-4 py-4">الموديل</th>
-                  <th className="px-4 py-4">البراند</th>
-                  <th className="px-4 py-4">الدرجة</th>
-                  <th className="px-4 py-4">البيع</th>
-                  {isOwner ? <th className="px-4 py-4">التكلفة</th> : null}
-                  <th className="px-4 py-4">المخزون</th>
-                  <th className="px-4 py-4">المقاس</th>
-                  <th className="px-4 py-4">اللون</th>
-                  <th className="px-4 py-4">SKU</th>
-                  <th className="px-4 py-4">الحالة</th>
-                  <th className="px-4 py-4">التنبيه</th>
-                  {isOwner ? <th className="px-4 py-4">إدارة</th> : null}
+                  <th>Product & SKU</th>
+                  <th>Grade</th>
+                  <th>Retail Price</th>
+                  {isOwner ? <th>Cost</th> : null}
+                  <th>Stock Status</th>
+                  <th>Size</th>
+                  <th>Color</th>
+                  <th>State</th>
+                  {isOwner ? <th className="min-w-[460px]">Owner Controls</th> : null}
                 </tr>
               </thead>
-
               <tbody>
-                {rows.length === 0 ? (
+                {searchedRows.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={isOwner ? 12 : 10}
-                      className="px-4 py-16 text-center text-sm text-white/45"
-                    >
-                      لا توجد منتجات مطابقة.
+                    <td colSpan={isOwner ? 9 : 8} className="py-16 text-center text-white/42">
+                      No matching products found.
                     </td>
                   </tr>
                 ) : (
-                  rows.map((row) => {
+                  searchedRows.map((row) => {
                     const alert = stockMeta(row.stockQty);
+                    const productName = row.model.brand ? `${row.model.brand} ${row.model.name}` : row.model.name;
 
                     return (
-                      <tr key={row.id} className="border-t border-white/10 align-top">
-                        <td className="px-4 py-4 font-bold">{row.model.name}</td>
-                        <td className="px-4 py-4 text-white/80">{row.model.brand ?? "-"}</td>
-                        <td className="px-4 py-4">
-                          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold">
-                            {row.grade}
-                          </span>
+                      <tr key={row.id} className={!row.isActive ? "opacity-60" : ""}>
+                        <td>
+                          <div className="flex items-center gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-[var(--surface-highest)] text-xs font-black text-white">
+                              {swatchText(row.model.brand || row.model.name)}
+                            </div>
+                            <div>
+                              <div className="font-black text-white">{productName}</div>
+                              <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-white/42">
+                                SKU: {row.sku || "-"}
+                              </div>
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-4 py-4 text-white/90">{formatEGP(row.sellPrice)}</td>
-                        {isOwner ? (
-                          <td className="px-4 py-4 text-white/60">{formatEGP(row.costPrice)}</td>
-                        ) : null}
-                        <td className="px-4 py-4 text-lg font-black">{row.stockQty}</td>
-                        <td className="px-4 py-4 text-white/80">{row.size ?? "-"}</td>
-                        <td className="px-4 py-4 text-white/80">{row.color ?? "-"}</td>
-                        <td className="px-4 py-4 text-white/70">{row.sku ?? "-"}</td>
-                        <td className="px-4 py-4">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${
-                              row.isActive
-                                ? "bg-emerald-500/20 text-emerald-200"
-                                : "bg-white/10 text-white/70"
-                            }`}
-                          >
-                            {row.isActive ? "نشط" : "غير نشط"}
-                          </span>
+                        <td>
+                          <span className="command-badge bg-white/[0.055] text-white/70">{row.grade}</span>
                         </td>
-                        <td className="px-4 py-4">
-                          <span className={`rounded-full border px-3 py-1 text-xs font-bold ${alert.cls}`}>
-                            {alert.label}
+                        <td className="font-black text-white">{formatEGP(row.sellPrice)}</td>
+                        {isOwner ? <td className="text-white/48">{formatEGP(row.costPrice)}</td> : null}
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2 w-2 rounded-full ${alert.dot}`} />
+                            <span className="font-black text-white">{row.stockQty} in stock</span>
+                            <span className={`command-badge ${alert.badge}`}>{alert.label}</span>
+                          </div>
+                        </td>
+                        <td className="text-white/65">{row.size || "-"}</td>
+                        <td className="text-white/65">{row.color || "-"}</td>
+                        <td>
+                          <span className={`command-badge ${row.isActive ? "bg-[var(--tertiary)]/12 text-[var(--tertiary)]" : "bg-white/[0.055] text-white/50"}`}>
+                            {row.isActive ? "Active" : "Inactive"}
                           </span>
                         </td>
 
                         {isOwner ? (
-                          <td className="px-4 py-4">
-                            <div className="flex min-w-[420px] flex-col gap-3">
-                              <form action={updateVariant} className="grid gap-2 rounded-2xl border border-white/10 bg-black/30 p-3">
+                          <td>
+                            <div className="grid gap-3">
+                              <form action={updateVariant} className="grid gap-2 bg-black/20 p-3 md:grid-cols-3">
                                 <input type="hidden" name="variantId" value={row.id} />
-
-                                <div className="grid gap-2 md:grid-cols-2">
-                                  <input
-                                    name="modelName"
-                                    defaultValue={row.model.name}
-                                    placeholder="اسم الموديل"
-                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
-                                  />
-                                  <input
-                                    name="brand"
-                                    defaultValue={row.model.brand ?? ""}
-                                    placeholder="البراند"
-                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
-                                  />
-                                  <select
-                                    name="grade"
-                                    defaultValue={row.grade}
-                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
-                                  >
-                                    <option value="ORIGINAL" className="bg-black">ORIGINAL</option>
-                                    <option value="MIRROR" className="bg-black">MIRROR</option>
-                                    <option value="EGYPTIAN" className="bg-black">EGYPTIAN</option>
-                                  </select>
-                                  <input
-                                    name="sku"
-                                    defaultValue={row.sku ?? ""}
-                                    placeholder="SKU"
-                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
-                                  />
-                                  <input
-                                    name="sellPrice"
-                                    type="number"
-                                    min="0"
-                                    defaultValue={row.sellPrice}
-                                    placeholder="سعر البيع"
-                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
-                                  />
-                                  <input
-                                    name="costPrice"
-                                    type="number"
-                                    min="0"
-                                    defaultValue={row.costPrice}
-                                    placeholder="سعر التكلفة"
-                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
-                                  />
-                                  <input
-                                    name="size"
-                                    defaultValue={row.size ?? ""}
-                                    placeholder="المقاس"
-                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
-                                  />
-                                  <input
-                                    name="color"
-                                    defaultValue={row.color ?? ""}
-                                    placeholder="اللون"
-                                    className="h-10 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none"
-                                  />
-                                </div>
-
-                                <button className="h-10 rounded-xl bg-red-600 px-4 text-xs font-extrabold hover:bg-red-500">
-                                  حفظ التعديل
-                                </button>
-                              </form>
-
-                              <form action={restockVariant} className="flex gap-2">
-                                <input type="hidden" name="id" value={row.id} />
-                                <input
-                                  name="qty"
-                                  type="number"
-                                  min="1"
-                                  placeholder="إضافة كمية"
-                                  className="h-10 flex-1 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none placeholder:text-white/35 focus:border-red-500/60"
-                                />
-                                <button className="h-10 rounded-xl bg-white/10 px-4 text-xs font-bold hover:bg-white/15">
-                                  تزويد
-                                </button>
+                                <input name="modelName" defaultValue={row.model.name} placeholder="Model" className="command-input h-10 px-3 text-xs" />
+                                <input name="brand" defaultValue={row.model.brand ?? ""} placeholder="Brand" className="command-input h-10 px-3 text-xs" />
+                                <select name="grade" defaultValue={row.grade} className="command-input h-10 px-3 text-xs">
+                                  <option value="ORIGINAL" className="bg-[#201f1f]">ORIGINAL</option>
+                                  <option value="MIRROR" className="bg-[#201f1f]">MIRROR</option>
+                                  <option value="EGYPTIAN" className="bg-[#201f1f]">EGYPTIAN</option>
+                                </select>
+                                <input name="sku" defaultValue={row.sku ?? ""} placeholder="SKU" className="command-input h-10 px-3 text-xs" />
+                                <input name="sellPrice" type="number" min="0" defaultValue={row.sellPrice} placeholder="Sell" className="command-input h-10 px-3 text-xs" />
+                                <input name="costPrice" type="number" min="0" defaultValue={row.costPrice} placeholder="Cost" className="command-input h-10 px-3 text-xs" />
+                                <input name="size" defaultValue={row.size ?? ""} placeholder="Size" className="command-input h-10 px-3 text-xs" />
+                                <input name="color" defaultValue={row.color ?? ""} placeholder="Color" className="command-input h-10 px-3 text-xs" />
+                                <button className="command-primary h-10 text-[10px] font-black uppercase tracking-[0.1em]">Update</button>
                               </form>
 
                               <div className="flex flex-wrap gap-2">
+                                <form action={restockVariant} className="flex gap-2">
+                                  <input type="hidden" name="id" value={row.id} />
+                                  <input name="qty" type="number" min="1" placeholder="Qty" className="command-input h-10 w-24 px-3 text-xs placeholder:text-white/30" />
+                                  <button className="command-secondary h-10 px-4 text-[10px] font-black uppercase tracking-[0.1em]">Restock</button>
+                                </form>
                                 <form action={toggleVariantActive}>
                                   <input type="hidden" name="id" value={row.id} />
                                   <input type="hidden" name="next" value={row.isActive ? "0" : "1"} />
-                                  <button
-                                    className={`h-10 rounded-xl px-4 text-xs font-bold ${
-                                      row.isActive
-                                        ? "bg-yellow-500/20 text-yellow-200 hover:bg-yellow-500/30"
-                                        : "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
-                                    }`}
-                                  >
-                                    {row.isActive ? "إيقاف" : "تفعيل"}
+                                  <button className="command-secondary h-10 px-4 text-[10px] font-black uppercase tracking-[0.1em]">
+                                    {row.isActive ? "Pause" : "Activate"}
                                   </button>
                                 </form>
-
                                 <form action={deleteVariant}>
                                   <input type="hidden" name="id" value={row.id} />
-                                  <button className="h-10 rounded-xl bg-red-600/20 px-4 text-xs font-bold text-red-200 hover:bg-red-600/30">
-                                    تعطيل
+                                  <button className="h-10 rounded-sm bg-[var(--primary)]/15 px-4 text-[10px] font-black uppercase tracking-[0.1em] text-[var(--primary-soft)] transition hover:bg-[var(--primary)]/25">
+                                    Disable
                                   </button>
                                 </form>
                               </div>
@@ -418,6 +364,6 @@ export default async function ProductsPage({
           </div>
         </section>
       </div>
-    </main>
+    </CommandShell>
   );
 }

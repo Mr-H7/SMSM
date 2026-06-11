@@ -1,21 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import CommandShell from "@/components/CommandShell";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
 import PrintButton from "./PrintButton";
-import {
-  addDays,
-  formatCairoDate,
-  formatCairoDateTime,
-} from "@/lib/cairo-time";
+import { addDays, formatCairoDate, formatCairoDateTime } from "@/lib/cairo-time";
 
 function money(n: number) {
-  return new Intl.NumberFormat("ar-EG").format(n || 0);
+  return new Intl.NumberFormat("en-EG", { maximumFractionDigits: 0 }).format(n || 0);
 }
 
 function getCustomerName(sale: any) {
-  return sale.customer || "عميل نقدي";
+  return sale.customer || "Walk-in customer";
 }
 
 function getItemQty(item: any) {
@@ -30,47 +27,35 @@ function getItemTotal(item: any) {
   return getItemQty(item) * getItemPrice(item);
 }
 
-export default async function InvoiceDetailsPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  await requireUser();
+function itemTitle(item: any) {
+  return [
+    item.variant?.model?.brand || "",
+    item.variant?.model?.name || "",
+    item.variant?.grade || "",
+    item.variant?.size || "",
+    item.variant?.color || "",
+  ]
+    .filter(Boolean)
+    .join(" - ");
+}
 
+export default async function InvoiceDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
   const { id } = await params;
 
   const sale = await prisma.sale.findUnique({
     where: { id },
     include: {
-      seller: {
-        select: {
-          username: true,
-          fullName: true,
-        },
-      },
+      seller: { select: { username: true, fullName: true } },
       items: {
         orderBy: { id: "asc" },
-        include: {
-          variant: {
-            include: {
-              model: true,
-            },
-          },
-        },
+        include: { variant: { include: { model: true } } },
       },
       returns: {
         orderBy: { createdAt: "desc" },
         include: {
           items: true,
-          replacements: {
-            include: {
-              variant: {
-                include: {
-                  model: true,
-                },
-              },
-            },
-          },
+          replacements: { include: { variant: { include: { model: true } } } },
         },
       },
     },
@@ -78,27 +63,18 @@ export default async function InvoiceDetailsPage({
 
   if (!sale) notFound();
 
-  const itemsSubtotal = sale.items.reduce(
-    (sum: number, item: any) => sum + getItemTotal(item),
-    0
-  );
-
+  const itemsSubtotal = sale.items.reduce((sum: number, item: any) => sum + getItemTotal(item), 0);
   const discount = sale.discount || 0;
   const finalTotal = sale.total ?? Math.max(0, itemsSubtotal - discount);
-
   const totalReturnedAmount = (sale.returns || []).reduce(
     (sum: number, r: any) => sum + (r.refundAmount || 0),
     0
   );
-
   const hasReturns = (sale.returns || []).length > 0;
   const returnLastDate = addDays(sale.createdAt, 10);
 
   return (
-    <div
-      dir="rtl"
-      className="min-h-screen bg-black text-white print:bg-white print:text-black"
-    >
+    <CommandShell active="invoices" user={user}>
       <style>
         {`
           @page {
@@ -127,33 +103,51 @@ export default async function InvoiceDetailsPage({
         `}
       </style>
 
-      <div className="mx-auto max-w-5xl px-4 py-8 print:max-w-none print:px-0 print:py-0">
-        <div className="mb-6 flex items-center justify-between print:hidden">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/invoices"
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-            >
-              رجوع للفواتير
-            </Link>
-
-            <Link
-              href={`/returns?q=${sale.id}`}
-              className={`rounded-xl px-4 py-2 text-sm ${
-                hasReturns
-                  ? "border border-red-500/30 bg-red-600/15 text-red-200 hover:bg-red-600/25"
-                  : "border border-white/10 bg-white/5 hover:bg-white/10"
-              }`}
-            >
-              مرتجع / استبدال
-            </Link>
+      <div className="mx-auto max-w-5xl space-y-6 print:max-w-none">
+        <div className="print-hidden flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="command-label">Thermal receipt</div>
+            <h1 className="mt-2 text-2xl font-black uppercase tracking-tight text-white">
+              Invoice Detail
+            </h1>
           </div>
-
-          <PrintButton />
+          <div className="flex flex-wrap gap-3">
+            <Link href="/invoices" className="command-secondary px-4 py-3 text-xs font-black uppercase tracking-[0.12em]">
+              Back
+            </Link>
+            <Link
+              href={`/returns?q=${encodeURIComponent(sale.id)}`}
+              className={hasReturns ? "command-primary px-4 py-3 text-xs font-black uppercase tracking-[0.12em]" : "command-secondary px-4 py-3 text-xs font-black uppercase tracking-[0.12em]"}
+            >
+              Return / Exchange
+            </Link>
+            <PrintButton />
+          </div>
         </div>
 
-        <div className="mx-auto w-full max-w-[302px] overflow-hidden rounded-2xl border border-neutral-200 bg-white text-black shadow-2xl print:max-w-[80mm] print:rounded-none print:border-0 print:shadow-none">
-          <div className="border-b border-neutral-200 bg-white px-4 py-4 text-center">
+        <div className="command-panel-high print-hidden grid gap-4 p-4 md:grid-cols-4">
+          <div>
+            <div className="command-label">Invoice</div>
+            <div className="mt-2 break-all font-mono text-xs font-black text-white">{sale.id}</div>
+          </div>
+          <div>
+            <div className="command-label">Payment</div>
+            <div className="mt-2 text-sm font-black text-white">
+              {sale.paymentMethod === "TRANSFER" ? "Transfer" : "Cash"}
+            </div>
+          </div>
+          <div>
+            <div className="command-label">Total</div>
+            <div className="mt-2 text-lg font-black text-white">{money(finalTotal)} EGP</div>
+          </div>
+          <div>
+            <div className="command-label">Returns</div>
+            <div className="mt-2 text-lg font-black text-white">{sale.returns.length}</div>
+          </div>
+        </div>
+
+        <article className="receipt-paper mx-auto w-full max-w-[302px] overflow-hidden rounded-sm border border-neutral-200 text-black shadow-[0_30px_80px_rgba(0,0,0,0.45)] print:max-w-[80mm] print:rounded-none print:border-0 print:shadow-none">
+          <header className="border-b border-neutral-200 bg-white px-4 py-5 text-center">
             <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-white">
               <Image
                 src="/smsm-logo.png"
@@ -165,179 +159,128 @@ export default async function InvoiceDetailsPage({
                 unoptimized
               />
             </div>
+            <h2 className="text-xl font-black tracking-wide">SMSM STORE</h2>
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-neutral-500">
+              Sales Receipt
+            </p>
+          </header>
 
-            <h1 className="text-xl font-black tracking-wide">SMSM</h1>
-            <p className="mt-1 text-xs text-neutral-700">فاتورة بيع</p>
-            <p className="text-[11px] text-neutral-500">Shoes Store Management</p>
-          </div>
-
-          <div className="space-y-2 border-b border-neutral-200 px-4 py-4 text-sm">
+          <section className="space-y-2 border-b border-neutral-200 px-4 py-4 text-[12px]">
             <div className="flex items-start justify-between gap-3">
-              <span className="text-neutral-500">رقم الفاتورة</span>
-              <span className="max-w-[180px] break-all text-left font-bold">
-                {sale.id}
-              </span>
+              <span className="text-neutral-500">Invoice ID</span>
+              <span className="max-w-[176px] break-all text-left font-black">{sale.id}</span>
             </div>
-
             <div className="flex items-center justify-between gap-3">
-              <span className="text-neutral-500">التاريخ</span>
-              <span className="font-bold">
-                {formatCairoDateTime(sale.createdAt)}
-              </span>
+              <span className="text-neutral-500">Cairo Time</span>
+              <span className="font-black">{formatCairoDateTime(sale.createdAt)}</span>
             </div>
-
             <div className="flex items-center justify-between gap-3">
-              <span className="text-neutral-500">العميل</span>
-              <span className="font-bold">{getCustomerName(sale)}</span>
+              <span className="text-neutral-500">Customer</span>
+              <span className="font-black">{getCustomerName(sale)}</span>
             </div>
-
             <div className="flex items-center justify-between gap-3">
-              <span className="text-neutral-500">البائع</span>
-              <span className="font-bold">
-                {sale.seller?.fullName || sale.seller?.username || "-"}
-              </span>
+              <span className="text-neutral-500">Seller</span>
+              <span className="font-black">{sale.seller?.fullName || sale.seller?.username || "-"}</span>
             </div>
-
             <div className="flex items-center justify-between gap-3">
-              <span className="text-neutral-500">طريقة الدفع</span>
-              <span className="font-bold">
-                {sale.paymentMethod === "TRANSFER" ? "تحويل" : "كاش"}
-              </span>
+              <span className="text-neutral-500">Payment</span>
+              <span className="font-black">{sale.paymentMethod === "TRANSFER" ? "Transfer" : "Cash"}</span>
             </div>
-
             {sale.paymentMethod === "TRANSFER" && sale.paymentDescription ? (
               <div className="flex items-start justify-between gap-3">
-                <span className="text-neutral-500 shrink-0">تفاصيل التحويل</span>
-                <span className="font-bold text-left break-all max-w-[180px]">
-                  {sale.paymentDescription}
-                </span>
+                <span className="shrink-0 text-neutral-500">Transfer</span>
+                <span className="max-w-[176px] break-all text-left font-black">{sale.paymentDescription}</span>
               </div>
             ) : null}
-          </div>
+          </section>
 
-          <div className="px-4 py-4">
-            <div className="mb-3 border-b border-dashed border-neutral-300 pb-2 text-center text-sm font-black">
-              تفاصيل المنتجات
+          <section className="px-4 py-4">
+            <div className="mb-3 border-b border-dashed border-neutral-300 pb-2 text-center text-[12px] font-black uppercase tracking-[0.12em]">
+              Items
             </div>
-
             <div className="space-y-3">
-              {sale.items.map((item: any, index: number) => {
-                const title = [
-                  item.variant?.model?.name || "",
-                  item.variant?.model?.brand || "",
-                  item.variant?.grade || "",
-                  item.variant?.size || "",
-                  item.variant?.color || "",
-                ]
-                  .filter(Boolean)
-                  .join(" - ");
-
-                return (
-                  <div
-                    key={item.id ?? index}
-                    className="border-b border-dashed border-neutral-200 pb-3 text-sm last:border-b-0"
-                  >
-                    <div className="font-bold leading-6">{title || "منتج"}</div>
-
-                    <div className="mt-2 flex items-center justify-between text-neutral-600">
-                      <span>الكمية</span>
+              {sale.items.map((item: any, index: number) => (
+                <div key={item.id ?? index} className="border-b border-dashed border-neutral-200 pb-3 text-[12px] last:border-b-0">
+                  <div className="font-black leading-5">{itemTitle(item) || "Product"}</div>
+                  <div className="mt-2 space-y-1 text-neutral-600">
+                    <div className="flex items-center justify-between">
+                      <span>Qty</span>
                       <span>{getItemQty(item)}</span>
                     </div>
-
-                    <div className="flex items-center justify-between text-neutral-600">
-                      <span>اللون</span>
-                      <span>{item.variant?.color || "-"}</span>
+                    <div className="flex items-center justify-between">
+                      <span>Unit</span>
+                      <span>{money(getItemPrice(item))} EGP</span>
                     </div>
-
-                    <div className="flex items-center justify-between text-neutral-600">
-                      <span>سعر الوحدة</span>
-                      <span>{money(getItemPrice(item))} ج.م</span>
-                    </div>
-
-                    <div className="mt-1 flex items-center justify-between font-black">
-                      <span>الإجمالي</span>
-                      <span>{money(getItemTotal(item))} ج.م</span>
+                    <div className="flex items-center justify-between font-black text-black">
+                      <span>Line</span>
+                      <span>{money(getItemTotal(item))} EGP</span>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
-          </div>
+          </section>
 
-          <div className="border-t border-neutral-200 px-4 py-4">
-            <div className="space-y-2 text-sm">
+          <section className="border-t border-neutral-200 px-4 py-4 text-[12px]">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-neutral-600">إجمالي المنتجات</span>
-                <span className="font-bold">{money(itemsSubtotal)} ج.م</span>
+                <span className="text-neutral-600">Items Subtotal</span>
+                <span className="font-black">{money(itemsSubtotal)} EGP</span>
               </div>
-
               <div className="flex items-center justify-between">
-                <span className="text-neutral-600">الخصم</span>
-                <span className="font-bold">{money(discount)} ج.م</span>
+                <span className="text-neutral-600">Discount</span>
+                <span className="font-black">{money(discount)} EGP</span>
               </div>
-
               <div className="flex items-center justify-between">
-                <span className="text-neutral-600">إجمالي المرتجعات</span>
-                <span className="font-bold">{money(totalReturnedAmount)} ج.م</span>
+                <span className="text-neutral-600">Returns Total</span>
+                <span className="font-black">{money(totalReturnedAmount)} EGP</span>
               </div>
-
               <div className="mt-3 border-t border-dashed border-neutral-300 pt-3">
                 <div className="flex items-center justify-between text-base font-black">
-                  <span>الصافي النهائي</span>
-                  <span>{money(finalTotal)} ج.م</span>
+                  <span>Final Total</span>
+                  <span>{money(finalTotal)} EGP</span>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
           {hasReturns ? (
-            <div className="border-t border-neutral-200 px-4 py-4">
-              <div className="mb-3 text-center text-sm font-black">
-                المرتجعات / الاستبدال
+            <section className="border-t border-neutral-200 px-4 py-4">
+              <div className="mb-3 text-center text-[12px] font-black uppercase tracking-[0.12em]">
+                Returns / Exchanges
               </div>
-
               <div className="space-y-3">
                 {sale.returns.map((ret: any) => (
-                  <div
-                    key={ret.id}
-                    className="rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm"
-                  >
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="font-bold">
-                        {ret.type === "EXCHANGE" ? "استبدال" : "مرتجع"}
-                      </span>
-                      <span className="text-xs text-neutral-500">
-                        {formatCairoDateTime(ret.createdAt)}
-                      </span>
+                  <div key={ret.id} className="border border-neutral-200 bg-neutral-50 p-3 text-[12px]">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="font-black">{ret.type === "EXCHANGE" ? "Exchange" : "Refund"}</span>
+                      <span className="text-[10px] text-neutral-500">{formatCairoDateTime(ret.createdAt)}</span>
                     </div>
-
                     <div className="flex items-center justify-between text-neutral-600">
-                      <span>مبلغ مسترد</span>
-                      <span>{money(ret.refundAmount || 0)} ج.م</span>
+                      <span>Refund</span>
+                      <span>{money(ret.refundAmount || 0)} EGP</span>
                     </div>
-
                     <div className="flex items-center justify-between text-neutral-600">
-                      <span>فرق إضافي</span>
-                      <span>{money(ret.extraAmount || 0)} ج.م</span>
+                      <span>Extra</span>
+                      <span>{money(ret.extraAmount || 0)} EGP</span>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           ) : null}
 
-          <div className="border-t border-neutral-200 bg-red-50 px-4 py-3 text-center text-[11px] leading-6 text-red-700">
-            آخر موعد للاسترجاع:{"10 أيام "}
-            <span className="font-black">{formatCairoDate(returnLastDate)}</span>
-          </div>
+          <section className="border-t border-neutral-200 bg-neutral-950 px-4 py-3 text-center text-[11px] font-bold leading-5 text-white">
+            Return deadline: <span className="font-black">{formatCairoDate(returnLastDate)}</span>
+          </section>
 
-          <div className="border-t border-neutral-200 px-4 py-4 text-center text-[11px] leading-6 text-neutral-500">
-            شكرًا لتعاملكم مع SMSM
+          <footer className="border-t border-neutral-200 px-4 py-4 text-center text-[11px] leading-5 text-neutral-500">
+            Thank you for shopping with SMSM.
             <br />
-            يرجى الاحتفاظ بالفاتورة حتى آخر موعد للاسترجاع
-          </div>
-        </div>
+            Please keep this receipt until the return deadline.
+          </footer>
+        </article>
       </div>
-    </div>
+    </CommandShell>
   );
 }

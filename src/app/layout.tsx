@@ -1,15 +1,16 @@
-// src/app/layout.tsx
 import "./globals.css";
 
 export const metadata = {
-  title: "نظام إدارة محل الأحذية",
-  description: "مبيعات، مخزون، فواتير، أرباح، صلاحيات",
+  title: "SMSM Store Command Center",
+  description: "Retail inventory, POS, invoices, returns, and store operations.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl">
-      <body className="min-h-screen bg-black text-white">{children}</body>
+    <html lang="en" dir="ltr">
+      <body className="min-h-screen bg-[var(--surface)] text-[var(--foreground)]">
+        {children}
+      </body>
     </html>
   );
 }

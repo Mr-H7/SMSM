@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
+import CommandShell from "@/components/CommandShell";
 import SalesNewClient from "./SalesNewClient";
 
 export default async function SalesNewPage() {
-  await requireUser();
+  const user = await requireUser();
 
   const variants = await prisma.productVariant.findMany({
     where: { isActive: true },
@@ -26,5 +27,9 @@ export default async function SalesNewPage() {
     take: 5000,
   });
 
-  return <SalesNewClient variants={variants as any} />;
+  return (
+    <CommandShell active="pos" user={user}>
+      <SalesNewClient variants={variants as any} />
+    </CommandShell>
+  );
 }

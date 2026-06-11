@@ -1,13 +1,23 @@
+import CommandShell from "@/components/CommandShell";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
+import { formatCairoDateTime } from "@/lib/cairo-time";
 
 type SearchParams = { q?: string };
+
+function formatEGP(value: number) {
+  return new Intl.NumberFormat("en-EG", {
+    style: "currency",
+    currency: "EGP",
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
 
 function getReturnBadge(returns: Array<{ type: "REFUND" | "EXCHANGE" }>) {
   if (returns.length === 0) {
     return {
-      label: "بدون مرتجع",
-      className: "border border-white/10 bg-white/5 text-white/60",
+      label: "Clear",
+      className: "bg-white/[0.055] text-white/55",
     };
   }
 
@@ -16,29 +26,26 @@ function getReturnBadge(returns: Array<{ type: "REFUND" | "EXCHANGE" }>) {
 
   if (hasRefund && hasExchange) {
     return {
-      label: `مرتجعات متعددة (${returns.length})`,
-      className: "border border-red-500/30 bg-red-600/15 text-red-300",
+      label: `Mixed (${returns.length})`,
+      className: "bg-[var(--primary)]/15 text-[var(--primary-soft)]",
     };
   }
 
   if (hasExchange) {
     return {
-      label: returns.length > 1 ? `استبدال (${returns.length})` : "استبدال",
-      className: "border border-yellow-500/30 bg-yellow-500/10 text-yellow-300",
+      label: returns.length > 1 ? `Exchange (${returns.length})` : "Exchange",
+      className: "bg-[#ffb4aa]/12 text-[#ffb4aa]",
     };
   }
 
   return {
-    label: returns.length > 1 ? `مرتجع (${returns.length})` : "مرتجع",
-    className: "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+    label: returns.length > 1 ? `Refund (${returns.length})` : "Refund",
+    className: "bg-[var(--tertiary)]/12 text-[var(--tertiary)]",
   };
 }
 
-export default async function InvoicesPage(props: {
-  searchParams: Promise<SearchParams>;
-}) {
-  await requireUser();
-
+export default async function InvoicesPage(props: { searchParams: Promise<SearchParams> }) {
+  const user = await requireUser();
   const sp = await props.searchParams;
   const q = (sp.q ?? "").trim();
 
@@ -61,6 +68,7 @@ export default async function InvoicesPage(props: {
       total: true,
       discount: true,
       customer: true,
+      paymentMethod: true,
       seller: { select: { username: true, fullName: true } },
       returns: {
         orderBy: { createdAt: "desc" },
@@ -77,213 +85,159 @@ export default async function InvoicesPage(props: {
 
   const totalInvoices = sales.length;
   const invoicesWithReturns = sales.filter((s) => s.returns.length > 0).length;
-  const refundInvoices = sales.filter((s) =>
-    s.returns.some((r) => r.type === "REFUND")
-  ).length;
-  const exchangeInvoices = sales.filter((s) =>
-    s.returns.some((r) => r.type === "EXCHANGE")
-  ).length;
+  const refundInvoices = sales.filter((s) => s.returns.some((r) => r.type === "REFUND")).length;
+  const exchangeInvoices = sales.filter((s) => s.returns.some((r) => r.type === "EXCHANGE")).length;
+  const totalValue = sales.reduce((sum, sale) => sum + (sale.total || 0), 0);
 
   return (
-    <div className="min-h-screen bg-black text-white" dir="rtl">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <CommandShell active="invoices" user={user}>
+      <div className="mx-auto max-w-7xl space-y-8">
+        <section className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">الفواتير</h1>
-            <p className="mt-1 text-sm text-white/60">
-              بحث + عرض + طباعة + ربط مباشر بالمرتجعات
+            <div className="command-label">Receipt control</div>
+            <h1 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">
+              Invoices
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-white/55">
+              Search, inspect, print thermal receipts, and launch refund or exchange workflows.
             </p>
           </div>
-
-          <a
-            href="/dashboard"
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-          >
-            رجوع
+          <a href="/sales/new" className="command-primary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
+            New Sale
           </a>
-        </div>
+        </section>
 
-        <div className="mb-5 grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-sm text-white/60">إجمالي الفواتير</div>
-            <div className="mt-2 text-3xl font-extrabold">{totalInvoices}</div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="command-card border-l-4 border-[var(--primary)] p-5">
+            <div className="command-label">Invoices</div>
+            <div className="mt-3 text-3xl font-black text-white">{totalInvoices}</div>
           </div>
-
-          <div className="rounded-2xl border border-red-500/30 bg-red-600/10 p-4">
-            <div className="text-sm text-red-200">فواتير عليها مرتجعات</div>
-            <div className="mt-2 text-3xl font-extrabold text-red-400">
-              {invoicesWithReturns}
-            </div>
+          <div className="command-card border-l-4 border-[var(--tertiary)] p-5">
+            <div className="command-label">Visible Value</div>
+            <div className="mt-3 text-2xl font-black text-white">{formatEGP(totalValue)}</div>
           </div>
-
-          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-            <div className="text-sm text-emerald-200">فواتير فيها مرتجع</div>
-            <div className="mt-2 text-3xl font-extrabold text-emerald-300">
-              {refundInvoices}
-            </div>
+          <div className="command-card border-l-4 border-[var(--primary)] p-5">
+            <div className="command-label">With Returns</div>
+            <div className="mt-3 text-3xl font-black text-white">{invoicesWithReturns}</div>
           </div>
-
-          <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4">
-            <div className="text-sm text-yellow-200">فواتير فيها استبدال</div>
-            <div className="mt-2 text-3xl font-extrabold text-yellow-300">
-              {exchangeInvoices}
+          <div className="command-card p-5">
+            <div className="command-label">Return Split</div>
+            <div className="mt-3 text-lg font-black text-white">
+              {refundInvoices} refund / {exchangeInvoices} exchange
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="mb-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <form action="/invoices" method="get" className="grid gap-3 md:grid-cols-12">
-            <div className="md:col-span-10">
-              <label className="mb-1 block text-sm text-white/70">بحث</label>
-              <input
-                name="q"
-                defaultValue={q}
-                placeholder="ابحث بـ Invoice ID أو اسم العميل أو البائع"
-                className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
-              />
-            </div>
-
-            <div className="flex items-end md:col-span-2">
-              <button className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold hover:bg-red-500">
-                بحث
-              </button>
-            </div>
-
+        <form action="/invoices" method="get" className="command-panel-high grid gap-3 p-4 md:grid-cols-12">
+          <div className="md:col-span-10">
+            <label className="command-label mb-2 block">Search</label>
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="Invoice ID, customer, seller..."
+              className="command-input h-12 w-full px-4 text-sm placeholder:text-white/30"
+            />
+          </div>
+          <div className="flex items-end md:col-span-2">
+            <button className="command-primary h-12 w-full text-xs font-black uppercase tracking-[0.12em]">
+              Search
+            </button>
+          </div>
+          {q ? (
             <div className="md:col-span-12">
-              <a
-                href="/invoices"
-                className="inline-flex items-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-              >
-                مسح
+              <a href="/invoices" className="text-xs font-black uppercase tracking-[0.12em] text-white/50 hover:text-white">
+                Clear filters
               </a>
             </div>
-          </form>
-        </div>
+          ) : null}
+        </form>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 overflow-x-auto">
-          <table className="w-full min-w-[1200px] border-collapse text-right text-sm">
-            <thead>
-              <tr className="border-b border-white/10 text-white/70">
-                <th className="py-3">التاريخ</th>
-                <th className="py-3">Invoice ID</th>
-                <th className="py-3">العميل</th>
-                <th className="py-3">البائع</th>
-                <th className="py-3">خصم</th>
-                <th className="py-3">الإجمالي</th>
-                <th className="py-3">حالة المرتجع</th>
-                <th className="py-3">آخر حركة</th>
-                <th className="py-3">إجراءات</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {sales.length === 0 ? (
+        <section className="command-panel overflow-hidden">
+          <div className="bg-[var(--surface-lowest)] px-5 py-4">
+            <div className="command-label">Invoice register</div>
+            <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">Thermal Receipt Index</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="command-table min-w-[1180px] text-left text-sm">
+              <thead>
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-white/50">
-                    لا توجد فواتير
-                  </td>
+                  <th>Date</th>
+                  <th>Invoice ID</th>
+                  <th>Customer</th>
+                  <th>Seller</th>
+                  <th>Payment</th>
+                  <th>Discount</th>
+                  <th>Total</th>
+                  <th>Returns</th>
+                  <th>Last Movement</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                sales.map((s) => {
-                  const badge = getReturnBadge(
-                    s.returns.map((r) => ({
-                      type: r.type as "REFUND" | "EXCHANGE",
-                    }))
-                  );
+              </thead>
 
-                  const latestReturn = s.returns[0] ?? null;
+              <tbody>
+                {sales.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-12 text-center text-white/42">
+                      No invoices found.
+                    </td>
+                  </tr>
+                ) : (
+                  sales.map((s) => {
+                    const badge = getReturnBadge(
+                      s.returns.map((r) => ({ type: r.type as "REFUND" | "EXCHANGE" }))
+                    );
+                    const latestReturn = s.returns[0] ?? null;
 
-                  return (
-                    <tr key={s.id} className="border-b border-white/5">
-                      <td className="py-3 text-white/70">
-                        {new Date(s.createdAt).toLocaleString("ar-EG")}
-                      </td>
-
-                      <td className="py-3 font-mono text-xs">{s.id}</td>
-
-                      <td className="py-3">{s.customer ?? "-"}</td>
-
-                      <td className="py-3">
-                        {s.seller.fullName ?? s.seller.username}
-                      </td>
-
-                      <td className="py-3">{s.discount}</td>
-
-                      <td className="py-3 font-bold text-red-400">{s.total}</td>
-
-                      <td className="py-3">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}
-                        >
-                          {badge.label}
-                        </span>
-                      </td>
-
-                      <td className="py-3">
-                        {latestReturn ? (
-                          <div className="space-y-1 text-xs">
-                            <div
-                              className={
-                                latestReturn.type === "EXCHANGE"
-                                  ? "text-yellow-300"
-                                  : "text-emerald-300"
-                              }
-                            >
-                              {latestReturn.type === "EXCHANGE"
-                                ? "استبدال"
-                                : "مرتجع"}
+                    return (
+                      <tr key={s.id}>
+                        <td className="text-white/58">{formatCairoDateTime(s.createdAt)}</td>
+                        <td className="max-w-[220px] break-all font-mono text-xs font-bold text-white">{s.id}</td>
+                        <td className="text-white/70">{s.customer || "-"}</td>
+                        <td className="text-white/70">{s.seller.fullName ?? s.seller.username}</td>
+                        <td>
+                          <span className="command-badge bg-white/[0.055] text-white/65">
+                            {s.paymentMethod === "TRANSFER" ? "Transfer" : "Cash"}
+                          </span>
+                        </td>
+                        <td className="text-white/58">{formatEGP(s.discount || 0)}</td>
+                        <td className="font-black text-white">{formatEGP(s.total || 0)}</td>
+                        <td>
+                          <span className={`command-badge ${badge.className}`}>{badge.label}</span>
+                        </td>
+                        <td>
+                          {latestReturn ? (
+                            <div className="space-y-1 text-xs">
+                              <div className={latestReturn.type === "EXCHANGE" ? "text-[#ffb4aa]" : "text-[var(--tertiary)]"}>
+                                {latestReturn.type === "EXCHANGE" ? "Exchange" : "Refund"}
+                              </div>
+                              <div className="text-white/40">{formatCairoDateTime(latestReturn.createdAt)}</div>
+                              <div className="text-white/60">
+                                Refund {formatEGP(latestReturn.refundAmount || 0)} / Extra {formatEGP(latestReturn.extraAmount || 0)}
+                              </div>
                             </div>
-
-                            <div className="text-white/45">
-                              {new Date(latestReturn.createdAt).toLocaleString(
-                                "ar-EG"
-                              )}
-                            </div>
-
-                            <div className="text-white/65">
-                              مسترد:{" "}
-                              <span className="text-white">
-                                {latestReturn.refundAmount}
-                              </span>
-                            </div>
-
-                            <div className="text-white/65">
-                              إضافي:{" "}
-                              <span className="text-white">
-                                {latestReturn.extraAmount}
-                              </span>
-                            </div>
+                          ) : (
+                            <span className="text-white/30">-</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="flex flex-wrap gap-2">
+                            <a href={`/invoices/${s.id}`} className="command-secondary px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em]">
+                              View
+                            </a>
+                            <a href={`/returns?q=${encodeURIComponent(s.id)}`} className="command-primary px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em]">
+                              Return
+                            </a>
                           </div>
-                        ) : (
-                          <span className="text-white/35">—</span>
-                        )}
-                      </td>
-
-                      <td className="py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <a
-                            href={`/invoices/${s.id}`}
-                            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs hover:bg-white/10"
-                          >
-                            عرض
-                          </a>
-
-                          <a
-                            href={`/returns?saleId=${s.id}`}
-                            className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold hover:bg-red-500"
-                          >
-                            مرتجع / استبدال
-                          </a>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
-    </div>
+    </CommandShell>
   );
 }

@@ -22,11 +22,25 @@ type CartItem = {
 
 type PaymentMethod = "CASH" | "TRANSFER";
 
-export default function SalesNewClient({
-  variants,
-}: {
-  variants: VariantRow[];
-}) {
+function formatEGP(value: number) {
+  return new Intl.NumberFormat("en-EG", {
+    style: "currency",
+    currency: "EGP",
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+function productName(v: VariantRow) {
+  return v.model.brand ? `${v.model.brand} ${v.model.name}` : v.model.name;
+}
+
+function stockBadge(qty: number) {
+  if (qty <= 0) return "bg-[var(--primary)]/15 text-[var(--primary-soft)]";
+  if (qty <= 5) return "bg-[#ffb4aa]/12 text-[#ffb4aa]";
+  return "bg-[var(--tertiary)]/12 text-[var(--tertiary)]";
+}
+
+export default function SalesNewClient({ variants }: { variants: VariantRow[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -57,17 +71,12 @@ export default function SalesNewClient({
 
       if (!q) return true;
 
-      const name = `${v.model.brand ?? ""} ${v.model.name}`.toLowerCase();
+      const name = productName(v).toLowerCase();
       const sku = (v.sku ?? "").toLowerCase();
       const color = (v.color ?? "").toLowerCase();
       const size = (v.size ?? "").toLowerCase();
 
-      return (
-        name.includes(q) ||
-        sku.includes(q) ||
-        color.includes(q) ||
-        size.includes(q)
-      );
+      return name.includes(q) || sku.includes(q) || color.includes(q) || size.includes(q);
     });
   }, [variants, query, exactPrice, grade]);
 
@@ -77,17 +86,22 @@ export default function SalesNewClient({
     return m;
   }, [cart]);
 
-  const subtotal = useMemo(() => {
-    let sum = 0;
-    for (const it of cart) {
-      const v = variants.find((x) => x.id === it.variantId);
-      if (!v) continue;
-      sum += it.qty * v.sellPrice;
-    }
-    return sum;
+  const cartRows = useMemo(() => {
+    return cart
+      .map((it) => {
+        const variant = variants.find((x) => x.id === it.variantId);
+        if (!variant) return null;
+        return { ...it, variant, lineTotal: it.qty * variant.sellPrice };
+      })
+      .filter(Boolean) as Array<CartItem & { variant: VariantRow; lineTotal: number }>;
   }, [cart, variants]);
 
-  const total = Math.max(0, subtotal - Math.max(0, Math.trunc(discount || 0)));
+  const subtotal = useMemo(() => {
+    return cartRows.reduce((sum, row) => sum + row.lineTotal, 0);
+  }, [cartRows]);
+
+  const safeDiscount = Math.max(0, Math.trunc(discount || 0));
+  const total = Math.max(0, subtotal - safeDiscount);
 
   function setQty(variantId: string, qty: number) {
     setError(null);
@@ -119,12 +133,12 @@ export default function SalesNewClient({
     setError(null);
 
     if (cart.length === 0) {
-      setError("السلة فاضية");
+      setError("Cart is empty.");
       return;
     }
 
     if (paymentMethod === "TRANSFER" && !paymentDescription.trim()) {
-      setError("اكتب تفاصيل التحويل");
+      setError("Transfer details are required for transfer payments.");
       return;
     }
 
@@ -141,242 +155,298 @@ export default function SalesNewClient({
         if (res?.ok) {
           router.push(`/invoices/${res.saleId}`);
         } else {
-          setError("حصل خطأ غير متوقع");
+          setError("Unexpected sale error.");
         }
       } catch (e: any) {
-        setError(e?.message ?? "حصل خطأ أثناء تنفيذ البيع");
+        setError(e?.message ?? "Sale execution failed.");
       }
     });
   }
 
   return (
-    <div className="min-h-screen bg-black text-white" dir="rtl">
-      <div className="mx-auto w-full max-w-7xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">بيع جديد (POS)</h1>
-            <p className="mt-1 text-sm text-white/60">
-              اختر الفاريانت ثم أضف الكمية ونفّذ البيع
-            </p>
-          </div>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <section className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="command-label">Point of sale</div>
+          <h1 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">
+            Fast Checkout
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-white/55">
+            Search inventory, select quantities, capture payment details, and issue a thermal receipt without exposing cost data.
+          </p>
+        </div>
+        <div className="command-panel px-4 py-3 text-right">
+          <div className="command-label">Live total</div>
+          <div className="mt-1 text-2xl font-black text-white">{formatEGP(total)}</div>
+        </div>
+      </section>
 
-          <a
-            href="/dashboard"
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+      <section className="command-panel-high grid gap-3 p-4 lg:grid-cols-12">
+        <div className="lg:col-span-6">
+          <label className="command-label mb-2 block">Search</label>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Name, brand, SKU, color, size..."
+            className="command-input h-12 w-full px-4 text-sm placeholder:text-white/30"
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <label className="command-label mb-2 block">Exact price</label>
+          <input
+            value={exactPrice}
+            onChange={(e) => setExactPrice(e.target.value)}
+            placeholder="Example: 600"
+            className="command-input h-12 w-full px-4 text-sm placeholder:text-white/30"
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <label className="command-label mb-2 block">Grade</label>
+          <select
+            value={grade}
+            onChange={(e) => setGrade(e.target.value as any)}
+            className="command-input h-12 w-full px-4 text-sm"
           >
-            رجوع
-          </a>
+            <option value="" className="bg-[#201f1f]">All Grades</option>
+            <option value="ORIGINAL" className="bg-[#201f1f]">ORIGINAL</option>
+            <option value="MIRROR" className="bg-[#201f1f]">MIRROR</option>
+            <option value="EGYPTIAN" className="bg-[#201f1f]">EGYPTIAN</option>
+          </select>
         </div>
+      </section>
 
-        <div className="mb-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="grid gap-3 md:grid-cols-12">
-            <div className="md:col-span-6">
-              <label className="mb-1 block text-sm text-white/70">
-                بحث (اسم / براند / SKU / لون / مقاس)
-              </label>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
-              />
+      <div className="grid gap-6 xl:grid-cols-12">
+        <section className="command-panel overflow-hidden xl:col-span-8">
+          <div className="flex items-center justify-between bg-[var(--surface-lowest)] px-5 py-4">
+            <div>
+              <div className="command-label">Product selection</div>
+              <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">
+                Sellable Inventory
+              </h2>
             </div>
-
-            <div className="md:col-span-3">
-              <label className="mb-1 block text-sm text-white/70">السعر (Exact)</label>
-              <input
-                value={exactPrice}
-                onChange={(e) => setExactPrice(e.target.value)}
-                placeholder="مثال: 600"
-                className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
-              />
-            </div>
-
-            <div className="md:col-span-3">
-              <label className="mb-1 block text-sm text-white/70">Grade</label>
-              <select
-                value={grade}
-                onChange={(e) => setGrade(e.target.value as any)}
-                className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
-              >
-                <option value="">الكل</option>
-                <option value="ORIGINAL">ORIGINAL</option>
-                <option value="MIRROR">MIRROR</option>
-                <option value="EGYPTIAN">EGYPTIAN</option>
-              </select>
-            </div>
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/42">
+              {filtered.length} visible
+            </span>
           </div>
-        </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-4">
-          <table className="w-full min-w-[1150px] border-collapse text-right text-sm">
-            <thead>
-              <tr className="border-b border-white/10 text-white/70">
-                <th className="py-3">المنتج</th>
-                <th className="py-3">الدرجة</th>
-                <th className="py-3">المقاس</th>
-                <th className="py-3">اللون</th>
-                <th className="py-3">SKU</th>
-                <th className="py-3">السعر</th>
-                <th className="py-3">المخزون</th>
-                <th className="py-3">الكمية</th>
-                <th className="py-3">إضافة</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filtered.length === 0 ? (
+          <div className="overflow-x-auto">
+            <table className="command-table min-w-[980px] text-left text-sm">
+              <thead>
                 <tr>
-                  <td colSpan={9} className="py-10 text-center text-white/50">
-                    لا توجد نتائج
-                  </td>
+                  <th>Product</th>
+                  <th>Grade</th>
+                  <th>Retail</th>
+                  <th>Stock</th>
+                  <th>Size</th>
+                  <th>Color</th>
+                  <th>Qty</th>
+                  <th></th>
                 </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-white/42">
+                      No products match the current search.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((v) => {
+                    const qty = cartMap.get(v.id) ?? 0;
+
+                    return (
+                      <tr key={v.id}>
+                        <td>
+                          <div className="font-black text-white">{productName(v)}</div>
+                          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-white/42">
+                            {v.sku || "-"}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="command-badge bg-white/[0.055] text-white/70">{v.grade}</span>
+                        </td>
+                        <td className="font-black text-white">{formatEGP(v.sellPrice)}</td>
+                        <td>
+                          <span className={`command-badge ${stockBadge(v.stockQty)}`}>{v.stockQty} left</span>
+                        </td>
+                        <td className="text-white/65">{v.size ?? "-"}</td>
+                        <td className="text-white/65">{v.color ?? "-"}</td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setQty(v.id, qty - 1)}
+                              disabled={qty <= 0}
+                              className="command-secondary h-9 w-9 text-sm font-black disabled:opacity-35"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              value={qty}
+                              min={0}
+                              max={v.stockQty}
+                              onChange={(e) => setQty(v.id, Number(e.target.value))}
+                              className="command-input h-9 w-20 px-3 text-center text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => addOne(v.id)}
+                              disabled={v.stockQty <= 0 || qty >= v.stockQty}
+                              className="command-secondary h-9 w-9 text-sm font-black disabled:opacity-35"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => addOne(v.id)}
+                            disabled={v.stockQty <= 0 || qty >= v.stockQty}
+                            className="command-primary h-9 px-4 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35"
+                          >
+                            Add
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside className="space-y-6 xl:col-span-4">
+          <section className="command-panel-high p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="command-label">Current cart</div>
+                <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">
+                  Ticket Build
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={clearCart}
+                disabled={isPending || cart.length === 0}
+                className="command-secondary px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35"
+              >
+                Clear
+              </button>
+            </div>
+
+            <div className="max-h-[310px] space-y-2 overflow-y-auto pr-1">
+              {cartRows.length === 0 ? (
+                <div className="bg-black/20 px-4 py-8 text-center text-sm text-white/42">
+                  No items selected.
+                </div>
               ) : (
-                filtered.map((v) => {
-                  const name = v.model.brand
-                    ? `${v.model.brand} ${v.model.name}`
-                    : v.model.name;
-                  const qty = cartMap.get(v.id) ?? 0;
-
-                  return (
-                    <tr key={v.id} className="border-b border-white/5">
-                      <td className="py-4 font-semibold">{name}</td>
-                      <td className="py-4">{v.grade}</td>
-                      <td className="py-4">{v.size ?? "-"}</td>
-                      <td className="py-4">{v.color ?? "-"}</td>
-                      <td className="py-4">{v.sku ?? "-"}</td>
-                      <td className="py-4 font-bold text-red-400">{v.sellPrice}</td>
-                      <td className="py-4">{v.stockQty}</td>
-                      <td className="py-4">
-                        <input
-                          type="number"
-                          value={qty}
-                          min={0}
-                          max={v.stockQty}
-                          onChange={(e) => setQty(v.id, Number(e.target.value))}
-                          className="w-24 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-red-500"
-                        />
-                      </td>
-                      <td className="py-4">
-                        <button
-                          type="button"
-                          onClick={() => addOne(v.id)}
-                          disabled={v.stockQty <= 0}
-                          className="rounded-lg bg-red-600 px-4 py-2 text-xs font-bold hover:bg-red-500 disabled:opacity-50"
-                        >
-                          +1
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
+                cartRows.map((row) => (
+                  <div key={row.variantId} className="bg-black/20 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-black text-white">{productName(row.variant)}</div>
+                        <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/42">
+                          Qty {row.qty} x {formatEGP(row.variant.sellPrice)}
+                        </div>
+                      </div>
+                      <div className="font-black text-white">{formatEGP(row.lineTotal)}</div>
+                    </div>
+                  </div>
+                ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </section>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-12">
-          <div className="md:col-span-7 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="grid gap-3 md:grid-cols-12">
-              <div className="md:col-span-6">
-                <label className="mb-1 block text-sm text-white/70">
-                  اسم العميل (اختياري)
-                </label>
+          <section className="command-panel-high p-5">
+            <div className="command-label">Checkout controls</div>
+            <div className="mt-4 grid gap-3">
+              <label className="grid gap-2">
+                <span className="command-label">Customer</span>
                 <input
                   value={customer}
                   onChange={(e) => setCustomer(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
+                  placeholder="Optional customer name"
+                  className="command-input h-12 px-4 text-sm placeholder:text-white/30"
                 />
-              </div>
+              </label>
 
-              <div className="md:col-span-6">
-                <label className="mb-1 block text-sm text-white/70">الخصم</label>
+              <label className="grid gap-2">
+                <span className="command-label">Discount</span>
                 <input
                   type="number"
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
+                  className="command-input h-12 px-4 text-sm"
                 />
-              </div>
+              </label>
 
-              <div className="md:col-span-12">
-                <label className="mb-1 block text-sm text-white/70">طريقة الدفع</label>
+              <label className="grid gap-2">
+                <span className="command-label">Payment method</span>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
+                  className="command-input h-12 px-4 text-sm"
                 >
-                  <option value="CASH">كاش</option>
-                  <option value="TRANSFER">تحويل</option>
+                  <option value="CASH" className="bg-[#201f1f]">Cash</option>
+                  <option value="TRANSFER" className="bg-[#201f1f]">Transfer</option>
                 </select>
-              </div>
+              </label>
 
               {paymentMethod === "TRANSFER" ? (
-                <div className="md:col-span-12">
-                  <label className="mb-1 block text-sm text-white/70">
-                    تفاصيل التحويل
-                  </label>
+                <label className="grid gap-2">
+                  <span className="command-label">Transfer details</span>
                   <textarea
                     value={paymentDescription}
                     onChange={(e) => setPaymentDescription(e.target.value)}
                     rows={3}
-                    placeholder="مثال: إنستاباي / فودافون كاش / رقم العملية / اسم المحول"
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-red-500"
+                    placeholder="Wallet, bank, reference number, sender name..."
+                    className="command-input px-4 py-3 text-sm placeholder:text-white/30"
                   />
-                </div>
+                </label>
               ) : null}
 
-              {error && (
-                <div className="md:col-span-12 rounded-xl border border-red-500/30 bg-red-600/10 p-3 text-sm text-red-300">
+              {error ? (
+                <div className="border border-[var(--primary)]/30 bg-[var(--primary)]/12 p-3 text-sm font-semibold text-[var(--primary-soft)]">
                   {error}
                 </div>
-              )}
-
-              <div className="md:col-span-12 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={submit}
-                  disabled={isPending}
-                  className="rounded-xl bg-red-600 px-6 py-3 text-sm font-bold hover:bg-red-500 disabled:opacity-50"
-                >
-                  {isPending ? "جاري التنفيذ..." : "تنفيذ البيع"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={clearCart}
-                  disabled={isPending}
-                  className="rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-sm hover:bg-white/10 disabled:opacity-50"
-                >
-                  تفريغ السلة
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="md:col-span-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-sm text-white/60">Subtotal</div>
-            <div className="mt-1 text-2xl font-extrabold">{subtotal}</div>
-
-            <div className="mt-3 text-sm text-white/60">Total</div>
-            <div className="mt-1 text-3xl font-extrabold text-red-500">{total}</div>
-
-            <div className="mt-4 rounded-xl border border-white/10 bg-black/30 p-3 text-sm">
-              <div className="text-white/60">طريقة الدفع المختارة</div>
-              <div className="mt-1 font-extrabold">
-                {paymentMethod === "CASH" ? "كاش" : "تحويل"}
-              </div>
-              {paymentMethod === "TRANSFER" && paymentDescription.trim() ? (
-                <div className="mt-2 break-words text-xs text-white/60">
-                  {paymentDescription}
-                </div>
               ) : null}
             </div>
+          </section>
 
-            <div className="mt-3 text-xs text-white/40">
-              (Profit/Cost not shown to sellers — server keeps cost snapshot only)
+          <section className="command-panel-high p-5">
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-white/55">Subtotal</span>
+                <span className="font-black text-white">{formatEGP(subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-white/55">Discount</span>
+                <span className="font-black text-white">{formatEGP(safeDiscount)}</span>
+              </div>
+              <div className="h-px bg-white/[0.06]" />
+              <div className="flex items-end justify-between">
+                <span className="command-label">Final total</span>
+                <span className="text-3xl font-black text-white">{formatEGP(total)}</span>
+              </div>
             </div>
-          </div>
-        </div>
+
+            <button
+              type="button"
+              onClick={submit}
+              disabled={isPending}
+              className="command-primary mt-5 h-12 w-full text-xs font-black uppercase tracking-[0.12em] disabled:opacity-45"
+            >
+              {isPending ? "Processing..." : "Complete Sale"}
+            </button>
+
+            <p className="mt-3 text-[11px] leading-5 text-white/38">
+              Cost and profit data are not shown in POS. The server keeps the cost snapshot for authorized reports only.
+            </p>
+          </section>
+        </aside>
       </div>
     </div>
   );

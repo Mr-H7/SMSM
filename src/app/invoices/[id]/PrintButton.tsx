@@ -5,9 +5,9 @@ export default function PrintButton() {
     <button
       type="button"
       onClick={() => window.print()}
-      className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500"
+      className="command-primary px-4 py-3 text-xs font-black uppercase tracking-[0.12em]"
     >
-      طباعة
+      Print
     </button>
   );
 }

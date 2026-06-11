@@ -1,400 +1,273 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
-import * as rbac from "@/lib/rbac";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import CommandShell from "@/components/CommandShell";
+import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/rbac";
 import {
   formatCairoDate,
   formatCairoDateTime,
   getCairoDayRange,
-  getCairoNow,
   getShiftAutoCloseLabel,
   isAfterShiftAutoClose,
 } from "@/lib/cairo-time";
 
 export const dynamic = "force-dynamic";
 
-async function getCurrentUser() {
-  const requireUser = (rbac as any).requireUser;
-  if (typeof requireUser === "function") {
-    try {
-      return await requireUser();
-    } catch {
-      return null;
-    }
-  }
-
-  const getSessionUser =
-    (rbac as any).getCurrentUser ??
-    (rbac as any).getSessionUser ??
-    (rbac as any).getUserFromSession;
-
-  if (typeof getSessionUser === "function") {
-    return await getSessionUser();
-  }
-
-  return null;
-}
-
-async function logoutAction() {
-  "use server";
-
-  const cookieStore = await cookies();
-  cookieStore.set("smsm_session", "", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(0),
-  });
-
-  redirect("/login");
-}
-
 function formatEGP(value: number) {
-  return new Intl.NumberFormat("ar-EG", {
+  return new Intl.NumberFormat("en-EG", {
     style: "currency",
     currency: "EGP",
     maximumFractionDigits: 0,
   }).format(Number.isFinite(value) ? value : 0);
 }
 
+function metricTone(tone: "red" | "blue" | "neutral") {
+  if (tone === "red") return "border-l-4 border-[var(--primary)]";
+  if (tone === "blue") return "border-l-4 border-[var(--tertiary)]";
+  return "border-l-4 border-white/10";
+}
+
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
+  const user = await requireUser();
   if (!user) redirect("/login");
 
   const todayRange = getCairoDayRange();
-  const cairoNow = getCairoNow();
+  const afterAutoClose = isAfterShiftAutoClose();
 
-  const [productsCount, lowStockCount, todaySales, todayReturns, usersCount, invoicesCount] =
-    await Promise.all([
-      prisma.productVariant.count(),
-      prisma.productVariant.count({
-        where: {
-          stockQty: {
-            lte: 7,
-          },
-        },
-      }),
-      prisma.sale.findMany({
-        where: {
-          createdAt: {
-            gte: todayRange.start,
-            lt: todayRange.end,
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.saleReturn.findMany({
-        where: {
-          createdAt: {
-            gte: todayRange.start,
-            lt: todayRange.end,
-          },
-        },
-      }),
-      prisma.user.count(),
-      prisma.sale.count(),
-    ]);
+  const [
+    productsCount,
+    lowStockCount,
+    outOfStockCount,
+    todaySales,
+    todayReturns,
+    usersCount,
+    invoicesCount,
+    totalReturnsCount,
+    alertVariants,
+  ] = await Promise.all([
+    prisma.productVariant.count(),
+    prisma.productVariant.count({ where: { stockQty: { gt: 0, lte: 7 } } }),
+    prisma.productVariant.count({ where: { stockQty: 0 } }),
+    prisma.sale.findMany({
+      where: { createdAt: { gte: todayRange.start, lt: todayRange.end } },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { seller: { select: { username: true, fullName: true } } },
+    }),
+    prisma.saleReturn.findMany({
+      where: { createdAt: { gte: todayRange.start, lt: todayRange.end } },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+    prisma.user.count(),
+    prisma.sale.count(),
+    prisma.saleReturn.count(),
+    prisma.productVariant.findMany({
+      where: { stockQty: { lte: 7 } },
+      orderBy: [{ stockQty: "asc" }, { updatedAt: "desc" }],
+      take: 6,
+      include: { model: true },
+    }),
+  ]);
 
   const todaySalesValue = todaySales.reduce((sum, sale) => sum + (sale.total || 0), 0);
   const todayDiscounts = todaySales.reduce((sum, sale) => sum + (sale.discount || 0), 0);
   const todayReturnsValue = todayReturns.reduce((sum, r) => sum + (r.refundAmount || 0), 0);
+  const role = String(user.role ?? "").toUpperCase();
 
-  const role = String(user.role ?? user.userRole ?? "").toUpperCase();
-  const isOwner = role === "OWNER";
-  const lastInvoice = todaySales[0] ?? null;
-  const afterAutoClose = isAfterShiftAutoClose();
+  const metrics = [
+    {
+      label: "Today Sales",
+      value: formatEGP(todaySalesValue),
+      meta: `${todaySales.length} invoices today`,
+      tone: "red" as const,
+    },
+    {
+      label: "Inventory Variants",
+      value: productsCount.toLocaleString("en-US"),
+      meta: `${lowStockCount} low stock alerts`,
+      tone: "neutral" as const,
+    },
+    {
+      label: "Out Of Stock",
+      value: outOfStockCount.toLocaleString("en-US"),
+      meta: "Requires restock action",
+      tone: "red" as const,
+    },
+    {
+      label: "Returns Today",
+      value: formatEGP(todayReturnsValue),
+      meta: `${todayReturns.length} return records`,
+      tone: "blue" as const,
+    },
+  ];
 
   return (
-    <main dir="rtl" className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="mb-8 rounded-[28px] border border-red-500/20 bg-gradient-to-b from-red-950/20 to-white/[0.02] p-5">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/sales/new"
-                className="inline-flex h-12 items-center rounded-2xl bg-red-600 px-5 text-sm font-extrabold transition hover:bg-red-500"
-              >
-                بيع جديد
-              </Link>
-              <Link
-                href="/products"
-                className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
-              >
-                المنتجات
-              </Link>
-              <Link
-                href="/invoices"
-                className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
-              >
-                الفواتير
-              </Link>
-              <Link
-                href="/returns"
-                className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
-              >
-                المرتجعات
-              </Link>
-              <Link
-                href="/shift-close"
-                className="inline-flex h-12 items-center rounded-2xl border border-red-500/30 bg-red-600/15 px-5 text-sm font-extrabold text-red-200 transition hover:bg-red-600/25"
-              >
-                إنهاء الشيفت
-              </Link>
+    <CommandShell active="dashboard" user={user}>
+      <div className="mx-auto max-w-7xl space-y-8">
+        <section className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="command-label">Retail operating system</div>
+            <h1 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">
+              SMSM Command Center
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-white/55">
+              Live store operations, inventory pressure, invoice movement, and shift status using current production data.
+            </p>
+          </div>
 
-              {isOwner ? (
-                <>
-                  <Link
-                    href="/reports"
-                    className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
-                  >
-                    التقارير
-                  </Link>
-                  <Link
-                    href="/targets"
-                    className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
-                  >
-                    الأهداف
-                  </Link>
-                  <Link
-                    href="/users"
-                    className="inline-flex h-12 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold transition hover:bg-white/10"
-                  >
-                    المستخدمون
-                  </Link>
-                </>
-              ) : null}
+          <div className="flex flex-wrap gap-3">
+            <Link href="/sales/new" className="command-primary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
+              New Sale
+            </Link>
+            <Link href="/products" className="command-secondary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
+              Inventory Hub
+            </Link>
+            <Link href="/shift-close" className="command-secondary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
+              Shift Close
+            </Link>
+          </div>
+        </section>
 
-              <form action={logoutAction}>
-                <button className="inline-flex h-12 items-center rounded-2xl border border-red-500/30 bg-red-600/15 px-5 text-sm font-extrabold text-red-200 transition hover:bg-red-600/25">
-                  تسجيل الخروج
-                </button>
-              </form>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {metrics.map((metric) => (
+            <div key={metric.label} className={`command-card p-5 ${metricTone(metric.tone)}`}>
+              <div className="command-label">{metric.label}</div>
+              <div className="mt-4 text-3xl font-black tracking-tight text-white">{metric.value}</div>
+              <div className="mt-3 h-px w-full bg-gradient-to-r from-[var(--primary)] via-white/10 to-transparent" />
+              <div className="mt-3 text-xs font-semibold text-white/45">{metric.meta}</div>
+            </div>
+          ))}
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-3">
+          <div className="command-panel-high p-5 xl:col-span-2">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <div className="command-label">Recent activity</div>
+                <h2 className="mt-2 text-xl font-black uppercase tracking-tight text-white">
+                  Latest Invoices
+                </h2>
+              </div>
+              <Link href="/invoices" className="text-xs font-black uppercase tracking-[0.12em] text-[var(--primary-soft)] hover:text-white">
+                View All
+              </Link>
             </div>
 
-            <div className="text-right">
-              <h1 className="text-4xl font-black tracking-tight">لوحة تحكم SMSM</h1>
-              <p className="mt-2 text-sm text-white/60">
-                نظام إدارة محل الأحذية — واجهة تشغيل تجارية عربية منظمة
+            <div className="overflow-x-auto">
+              <table className="command-table min-w-[760px] text-left text-sm">
+                <thead>
+                  <tr>
+                    <th>Invoice</th>
+                    <th>Seller</th>
+                    <th>Time</th>
+                    <th className="text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {todaySales.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-12 text-center text-white/42">
+                        No invoices recorded for the current Cairo business day.
+                      </td>
+                    </tr>
+                  ) : (
+                    todaySales.map((sale) => (
+                      <tr key={sale.id}>
+                        <td>
+                          <Link href={`/invoices/${sale.id}`} className="font-mono text-xs font-bold text-white hover:text-[var(--primary-soft)]">
+                            {sale.id}
+                          </Link>
+                        </td>
+                        <td className="text-white/70">{sale.seller?.fullName || sale.seller?.username || "-"}</td>
+                        <td className="text-white/55">{formatCairoDateTime(sale.createdAt)}</td>
+                        <td className="text-right font-black text-white">{formatEGP(sale.total || 0)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className={`command-panel-high p-5 ${afterAutoClose ? "border-l-4 border-[var(--primary)]" : "border-l-4 border-[var(--tertiary)]"}`}>
+              <div className="command-label">Shift pulse</div>
+              <h2 className="mt-2 text-xl font-black uppercase tracking-tight text-white">
+                {afterAutoClose ? "Close Required" : "Open Window"}
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-white/60">
+                {afterAutoClose
+                  ? `Auto-close time ${getShiftAutoCloseLabel()} has passed. Review and close the shift.`
+                  : `Shift remains operational until ${getShiftAutoCloseLabel()}.`}
               </p>
-              <div className="mt-3 inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold">
-                {user.username} · {role}
+              <div className="mt-4 text-xs font-bold text-white/45">Cairo date: {formatCairoDate(new Date())}</div>
+            </div>
+
+            <div className="command-panel-high p-5">
+              <div className="command-label">Operational summary</div>
+              <div className="mt-4 space-y-3">
+                {[
+                  ["Total invoices", invoicesCount],
+                  ["Total returns", totalReturnsCount],
+                  ["Users", usersCount],
+                  ["Discounts today", formatEGP(todayDiscounts)],
+                  ["Current role", role || "-"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between bg-black/20 px-4 py-3">
+                    <span className="text-sm text-white/58">{label}</span>
+                    <span className="text-sm font-black text-white">{value}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </section>
 
-        <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-5">
-            <div className="text-sm text-cyan-100/80">الوقت الحالي</div>
-            <div className="mt-3 text-xl font-black text-cyan-200">
-              {formatCairoDateTime(new Date())}
+        <section className="command-panel-high p-5">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <div className="command-label">Inventory alerts</div>
+              <h2 className="mt-2 text-xl font-black uppercase tracking-tight text-white">
+                Stock Pressure
+              </h2>
             </div>
-            <div className="mt-2 text-sm text-cyan-100/60">
-              توقيت القاهرة
-            </div>
+            <span className="command-badge bg-[var(--primary)]/15 text-[var(--primary-soft)]">
+              {alertVariants.length} active alerts
+            </span>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="text-sm text-white/60">مبيعات اليوم</div>
-            <div className="mt-3 text-3xl font-black">{todaySales.length}</div>
-            <div className="mt-2 text-sm text-white/50">عدد الفواتير اليوم</div>
-          </div>
-
-          <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-5">
-            <div className="text-sm text-red-100/80">نفد المخزون</div>
-            <div className="mt-3 text-3xl font-black text-red-300">
-              {await prisma.productVariant.count({ where: { stockQty: 0 } })}
-            </div>
-            <div className="mt-2 text-sm text-red-100/60">يحتاج إعادة تخزين</div>
-          </div>
-
-          <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-5">
-            <div className="text-sm text-yellow-100/80">مخزون منخفض</div>
-            <div className="mt-3 text-3xl font-black text-yellow-300">{lowStockCount}</div>
-            <div className="mt-2 text-sm text-yellow-100/60">من 1 إلى 7</div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {alertVariants.length === 0 ? (
+              <div className="col-span-full bg-black/20 px-4 py-8 text-center text-sm text-white/45">
+                No low-stock products are currently visible.
+              </div>
+            ) : (
+              alertVariants.map((variant) => (
+                <Link
+                  key={variant.id}
+                  href={`/products?q=${encodeURIComponent(variant.sku || variant.model.name)}`}
+                  className="group bg-black/20 p-4 transition hover:bg-white/[0.045]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-black text-white group-hover:text-[var(--primary-soft)]">
+                        {variant.model.brand ? `${variant.model.brand} ${variant.model.name}` : variant.model.name}
+                      </div>
+                      <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-white/42">
+                        {variant.sku || variant.grade}
+                      </div>
+                    </div>
+                    <span className="command-badge bg-[var(--primary)]/15 text-[var(--primary-soft)]">
+                      {variant.stockQty} left
+                    </span>
+                  </div>
+                </Link>
+              ))
+            )}
           </div>
         </section>
-
-        <section className="mb-8 grid gap-4 md:grid-cols-2">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="text-sm text-white/60">تاريخ اليوم التشغيلي</div>
-            <div className="mt-3 text-2xl font-black">{formatCairoDate(new Date())}</div>
-            <div className="mt-2 text-sm text-white/50">
-              جميع الحسابات المعروضة هنا مبنية على توقيت القاهرة
-            </div>
-          </div>
-
-          <div
-            className={`rounded-3xl border p-5 ${
-              afterAutoClose
-                ? "border-red-500/30 bg-red-600/10"
-                : "border-emerald-500/20 bg-emerald-500/10"
-            }`}
-          >
-            <div className="text-sm">
-              {afterAutoClose ? "تنبيه الشيفت" : "حالة الشيفت"}
-            </div>
-            <div className="mt-3 text-2xl font-black">
-              {afterAutoClose
-                ? `تم تجاوز وقت الإغلاق التلقائي (${getShiftAutoCloseLabel()})`
-                : `الشيفت مفتوح حتى ${getShiftAutoCloseLabel()}`}
-            </div>
-            <div className="mt-2 text-sm opacity-80">
-              يمكنك الدخول إلى صفحة إنهاء الشيفت لإنهاء اليوم ومراجعة الملخص.
-            </div>
-          </div>
-        </section>
-
-        <div className="grid gap-6 xl:grid-cols-3">
-          <section className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-            <h2 className="mb-5 text-2xl font-extrabold">ملخص التشغيل</h2>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
-                <span className="text-white/70">إجمالي الفواتير</span>
-                <span className="text-xl font-black">{invoicesCount}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
-                <span className="text-white/70">مرتجعات مسجلة</span>
-                <span className="text-xl font-black">{await prisma.saleReturn.count()}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
-                <span className="text-white/70">عدد المستخدمين</span>
-                <span className="text-xl font-black">{usersCount}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
-                <span className="text-white/70">فواتير اليوم</span>
-                <span className="text-xl font-black">{todaySales.length}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
-                <span className="text-white/70">مرتجعات اليوم</span>
-                <span className="text-xl font-black">{todayReturns.length}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 px-4 py-4">
-                <span className="text-white/70">آخر فاتورة اليوم</span>
-                <span className="text-sm font-black">
-                  {lastInvoice ? formatCairoDateTime(lastInvoice.createdAt) : "-"}
-                </span>
-              </div>
-            </div>
-          </section>
-
-          <section className="xl:col-span-2 space-y-6">
-            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-              <h2 className="mb-5 text-2xl font-extrabold">ملخص اليوم</h2>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-                  <div className="text-sm text-white/60">إجمالي مبيعات اليوم</div>
-                  <div className="mt-3 text-3xl font-black">{formatEGP(todaySalesValue)}</div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-                  <div className="text-sm text-white/60">خصومات اليوم</div>
-                  <div className="mt-3 text-3xl font-black">{formatEGP(todayDiscounts)}</div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-                  <div className="text-sm text-white/60">مرتجعات اليوم</div>
-                  <div className="mt-3 text-3xl font-black">{formatEGP(todayReturnsValue)}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-              <h2 className="mb-5 text-2xl font-extrabold">الوصول السريع</h2>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <Link
-                  href="/products"
-                  className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
-                >
-                  <div className="text-lg font-extrabold">المنتجات والمخزون</div>
-                  <div className="mt-2 text-sm text-white/55">
-                    عرض المنتجات وإعادة التخزين والمتابعة.
-                  </div>
-                </Link>
-
-                <Link
-                  href="/sales/new"
-                  className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
-                >
-                  <div className="text-lg font-extrabold">إنشاء فاتورة جديدة</div>
-                  <div className="mt-2 text-sm text-white/55">
-                    ابدأ عملية بيع جديدة بسرعة.
-                  </div>
-                </Link>
-
-                <Link
-                  href="/returns"
-                  className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
-                >
-                  <div className="text-lg font-extrabold">المرتجعات والاستبدال</div>
-                  <div className="mt-2 text-sm text-white/55">
-                    استرجاع أو استبدال وربط بالفواتير.
-                  </div>
-                </Link>
-
-                <Link
-                  href="/invoices"
-                  className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
-                >
-                  <div className="text-lg font-extrabold">عرض الفواتير</div>
-                  <div className="mt-2 text-sm text-white/55">
-                    تفاصيل الفواتير والطباعة والمتابعة.
-                  </div>
-                </Link>
-
-                <Link
-                  href="/shift-close"
-                  className="rounded-2xl border border-red-500/30 bg-red-600/10 p-5 transition hover:border-red-500/50 hover:bg-red-600/15"
-                >
-                  <div className="text-lg font-extrabold">إنهاء الشيفت</div>
-                  <div className="mt-2 text-sm text-white/70">
-                    مراجعة ملخص اليوم وإنهاء الشيفت يدويًا.
-                  </div>
-                </Link>
-
-                {isOwner ? (
-                  <>
-                    <Link
-                      href="/reports"
-                      className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
-                    >
-                      <div className="text-lg font-extrabold">التقارير</div>
-                      <div className="mt-2 text-sm text-white/55">
-                        تقارير التشغيل والأرباح والمراجعة العامة.
-                      </div>
-                    </Link>
-
-                    <Link
-                      href="/targets"
-                      className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
-                    >
-                      <div className="text-lg font-extrabold">الأهداف</div>
-                      <div className="mt-2 text-sm text-white/55">
-                        إدارة هدف اليوم والشهر والبائعين.
-                      </div>
-                    </Link>
-
-                    <Link
-                      href="/users"
-                      className="rounded-2xl border border-white/10 bg-black/30 p-5 transition hover:border-red-500/40 hover:bg-white/[0.04]"
-                    >
-                      <div className="text-lg font-extrabold">المستخدمون</div>
-                      <div className="mt-2 text-sm text-white/55">
-                        إنشاء وإدارة الحسابات والصلاحيات.
-                      </div>
-                    </Link>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          </section>
-        </div>
       </div>
-    </main>
+    </CommandShell>
   );
 }
