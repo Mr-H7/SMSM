@@ -6,7 +6,7 @@ import { formatCairoDateTime } from "@/lib/cairo-time";
 type SearchParams = { q?: string };
 
 function formatEGP(value: number) {
-  return new Intl.NumberFormat("en-EG", {
+  return new Intl.NumberFormat("ar-EG", {
     style: "currency",
     currency: "EGP",
     maximumFractionDigits: 0,
@@ -16,7 +16,7 @@ function formatEGP(value: number) {
 function getReturnBadge(returns: Array<{ type: "REFUND" | "EXCHANGE" }>) {
   if (returns.length === 0) {
     return {
-      label: "Clear",
+      label: "صافي",
       className: "bg-white/[0.055] text-white/55",
     };
   }
@@ -26,20 +26,20 @@ function getReturnBadge(returns: Array<{ type: "REFUND" | "EXCHANGE" }>) {
 
   if (hasRefund && hasExchange) {
     return {
-      label: `Mixed (${returns.length})`,
+      label: `مختلط (${returns.length})`,
       className: "bg-[var(--primary)]/15 text-[var(--primary-soft)]",
     };
   }
 
   if (hasExchange) {
     return {
-      label: returns.length > 1 ? `Exchange (${returns.length})` : "Exchange",
+      label: returns.length > 1 ? `استبدال (${returns.length})` : "استبدال",
       className: "bg-[#ffb4aa]/12 text-[#ffb4aa]",
     };
   }
 
   return {
-    label: returns.length > 1 ? `Refund (${returns.length})` : "Refund",
+    label: returns.length > 1 ? `استرداد (${returns.length})` : "استرداد",
     className: "bg-[var(--tertiary)]/12 text-[var(--tertiary)]",
   };
 }
@@ -94,59 +94,59 @@ export default async function InvoicesPage(props: { searchParams: Promise<Search
       <div className="mx-auto max-w-7xl space-y-8">
         <section className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="command-label">Receipt control</div>
+            <div className="command-label">إدارة الإيصالات</div>
             <h1 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">
-              Invoices
+              الفواتير
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-white/55">
-              Search, inspect, print thermal receipts, and launch refund or exchange workflows.
+              بحث ومراجعة وطباعة الفواتير الحرارية وفتح مسارات الاسترداد أو الاستبدال.
             </p>
           </div>
           <a href="/sales/new" className="command-primary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
-            New Sale
+            بيع جديد
           </a>
         </section>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="command-card border-l-4 border-[var(--primary)] p-5">
-            <div className="command-label">Invoices</div>
+          <div className="command-card border-r-4 border-[var(--primary)] p-5">
+            <div className="command-label">الفواتير</div>
             <div className="mt-3 text-3xl font-black text-white">{totalInvoices}</div>
           </div>
-          <div className="command-card border-l-4 border-[var(--tertiary)] p-5">
-            <div className="command-label">Visible Value</div>
+          <div className="command-card border-r-4 border-[var(--tertiary)] p-5">
+            <div className="command-label">القيمة الظاهرة</div>
             <div className="mt-3 text-2xl font-black text-white">{formatEGP(totalValue)}</div>
           </div>
-          <div className="command-card border-l-4 border-[var(--primary)] p-5">
-            <div className="command-label">With Returns</div>
+          <div className="command-card border-r-4 border-[var(--primary)] p-5">
+            <div className="command-label">بها مرتجعات</div>
             <div className="mt-3 text-3xl font-black text-white">{invoicesWithReturns}</div>
           </div>
           <div className="command-card p-5">
-            <div className="command-label">Return Split</div>
+            <div className="command-label">تقسيم المرتجعات</div>
             <div className="mt-3 text-lg font-black text-white">
-              {refundInvoices} refund / {exchangeInvoices} exchange
+              {refundInvoices} استرداد / {exchangeInvoices} استبدال
             </div>
           </div>
         </section>
 
         <form action="/invoices" method="get" className="command-panel-high grid gap-3 p-4 md:grid-cols-12">
           <div className="md:col-span-10">
-            <label className="command-label mb-2 block">Search</label>
+            <label className="command-label mb-2 block">بحث</label>
             <input
               name="q"
               defaultValue={q}
-              placeholder="Invoice ID, customer, seller..."
+              placeholder="رقم الفاتورة، العميل، البائع..."
               className="command-input h-12 w-full px-4 text-sm placeholder:text-white/30"
             />
           </div>
           <div className="flex items-end md:col-span-2">
             <button className="command-primary h-12 w-full text-xs font-black uppercase tracking-[0.12em]">
-              Search
+              بحث
             </button>
           </div>
           {q ? (
             <div className="md:col-span-12">
               <a href="/invoices" className="text-xs font-black uppercase tracking-[0.12em] text-white/50 hover:text-white">
-                Clear filters
+                مسح التصفية
               </a>
             </div>
           ) : null}
@@ -154,23 +154,23 @@ export default async function InvoicesPage(props: { searchParams: Promise<Search
 
         <section className="command-panel overflow-hidden">
           <div className="bg-[var(--surface-lowest)] px-5 py-4">
-            <div className="command-label">Invoice register</div>
-            <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">Thermal Receipt Index</h2>
+            <div className="command-label">سجل الفواتير</div>
+            <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">فهرس الإيصالات الحرارية</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="command-table min-w-[1180px] text-left text-sm">
+            <table className="command-table min-w-[1180px] text-right text-sm">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Invoice ID</th>
-                  <th>Customer</th>
-                  <th>Seller</th>
-                  <th>Payment</th>
-                  <th>Discount</th>
-                  <th>Total</th>
-                  <th>Returns</th>
-                  <th>Last Movement</th>
-                  <th>Actions</th>
+                  <th>التاريخ</th>
+                  <th>رقم الفاتورة</th>
+                  <th>العميل</th>
+                  <th>البائع</th>
+                  <th>الدفع</th>
+                  <th>الخصم</th>
+                  <th>الإجمالي</th>
+                  <th>المرتجعات</th>
+                  <th>آخر حركة</th>
+                  <th>إجراءات</th>
                 </tr>
               </thead>
 
@@ -178,7 +178,7 @@ export default async function InvoicesPage(props: { searchParams: Promise<Search
                 {sales.length === 0 ? (
                   <tr>
                     <td colSpan={10} className="py-12 text-center text-white/42">
-                      No invoices found.
+                      لا توجد فواتير.
                     </td>
                   </tr>
                 ) : (
@@ -196,7 +196,7 @@ export default async function InvoicesPage(props: { searchParams: Promise<Search
                         <td className="text-white/70">{s.seller.fullName ?? s.seller.username}</td>
                         <td>
                           <span className="command-badge bg-white/[0.055] text-white/65">
-                            {s.paymentMethod === "TRANSFER" ? "Transfer" : "Cash"}
+                            {s.paymentMethod === "TRANSFER" ? "تحويل" : "نقدي"}
                           </span>
                         </td>
                         <td className="text-white/58">{formatEGP(s.discount || 0)}</td>
@@ -208,11 +208,11 @@ export default async function InvoicesPage(props: { searchParams: Promise<Search
                           {latestReturn ? (
                             <div className="space-y-1 text-xs">
                               <div className={latestReturn.type === "EXCHANGE" ? "text-[#ffb4aa]" : "text-[var(--tertiary)]"}>
-                                {latestReturn.type === "EXCHANGE" ? "Exchange" : "Refund"}
+                                {latestReturn.type === "EXCHANGE" ? "استبدال" : "استرداد"}
                               </div>
                               <div className="text-white/40">{formatCairoDateTime(latestReturn.createdAt)}</div>
                               <div className="text-white/60">
-                                Refund {formatEGP(latestReturn.refundAmount || 0)} / Extra {formatEGP(latestReturn.extraAmount || 0)}
+                                استرداد {formatEGP(latestReturn.refundAmount || 0)} / فرق {formatEGP(latestReturn.extraAmount || 0)}
                               </div>
                             </div>
                           ) : (
@@ -222,10 +222,10 @@ export default async function InvoicesPage(props: { searchParams: Promise<Search
                         <td>
                           <div className="flex flex-wrap gap-2">
                             <a href={`/invoices/${s.id}`} className="command-secondary px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em]">
-                              View
+                              عرض
                             </a>
                             <a href={`/returns?q=${encodeURIComponent(s.id)}`} className="command-primary px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em]">
-                              Return
+                              مرتجع
                             </a>
                           </div>
                         </td>

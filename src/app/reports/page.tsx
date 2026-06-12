@@ -1,13 +1,15 @@
 import Link from "next/link";
+import CommandShell from "@/components/CommandShell";
+import { BackToDashboard, EmptyState, MetricCard, PageHeader, ProgressBar, StatusBadge } from "@/components/CommandUI";
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/rbac";
+import { formatCairoDateTime, getCairoDayRange } from "@/lib/cairo-time";
 
 export const dynamic = "force-dynamic";
 
-function startOfToday() {
+function startOfMonth() {
   const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
 }
 
 function formatEGP(value: number) {
@@ -18,262 +20,240 @@ function formatEGP(value: number) {
   }).format(Number.isFinite(value) ? value : 0);
 }
 
+function percent(value: number, max: number) {
+  if (!max) return 0;
+  return Math.round((value / max) * 100);
+}
+
 export default async function ReportsPage() {
   const user = await requireOwner();
-  const today = startOfToday();
+  const today = getCairoDayRange();
+  const monthStart = startOfMonth();
 
   const [
-    todaySalesCount,
-    todaySalesAgg,
-    todayReturnsCount,
-    todayReturnsAgg,
-    invoicesWithReturnsCount,
-    totalSalesCount,
-    totalSalesAgg,
-    totalReturnsCount,
-    totalProductsCount,
+    todaySales,
+    todayReturns,
+    monthSales,
+    recentSales,
+    recentReturns,
+    productCount,
     lowStockCount,
+    invoicesWithReturns,
   ] = await Promise.all([
-    prisma.sale.count({
-      where: {
-        createdAt: { gte: today },
-      },
+    prisma.sale.findMany({ where: { createdAt: { gte: today.start, lt: today.end } } }),
+    prisma.saleReturn.findMany({ where: { createdAt: { gte: today.start, lt: today.end } } }),
+    prisma.sale.findMany({
+      where: { createdAt: { gte: monthStart } },
+      include: { seller: { select: { username: true, fullName: true } } },
+      orderBy: { createdAt: "asc" },
     }),
-
-    prisma.sale.aggregate({
-      where: {
-        createdAt: { gte: today },
-      },
-      _sum: {
-        total: true,
-        discount: true,
-      },
+    prisma.sale.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { seller: { select: { username: true, fullName: true } }, returns: true },
     }),
-
-    prisma.saleReturn.count({
-      where: {
-        createdAt: { gte: today },
-      },
+    prisma.saleReturn.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { sale: { select: { id: true, customer: true } }, createdBy: { select: { username: true, fullName: true } } },
     }),
-
-    prisma.saleReturn.aggregate({
-      where: {
-        createdAt: { gte: today },
-      },
-      _sum: {
-        returnedValue: true,
-        refundAmount: true,
-        extraAmount: true,
-      },
-    }),
-
-    prisma.sale.count({
-      where: {
-        returns: {
-          some: {},
-        },
-      },
-    }),
-
-    prisma.sale.count(),
-
-    prisma.sale.aggregate({
-      _sum: {
-        total: true,
-        discount: true,
-      },
-    }),
-
-    prisma.saleReturn.count(),
-
     prisma.productVariant.count(),
-
-    prisma.productVariant.count({
-      where: {
-        stockQty: { lte: 5 },
-      },
-    }),
+    prisma.productVariant.count({ where: { stockQty: { lte: 5 } } }),
+    prisma.sale.count({ where: { returns: { some: {} } } }),
   ]);
 
-  const todaySalesTotal = Number(todaySalesAgg._sum.total ?? 0);
-  const todayDiscountTotal = Number(todaySalesAgg._sum.discount ?? 0);
+  const todayRevenue = todaySales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+  const todayDiscounts = todaySales.reduce((sum, sale) => sum + (sale.discount || 0), 0);
+  const todayRefunds = todayReturns.reduce((sum, row) => sum + (row.refundAmount || 0), 0);
+  const todayExtra = todayReturns.reduce((sum, row) => sum + (row.extraAmount || 0), 0);
+  const monthRevenue = monthSales.reduce((sum, sale) => sum + (sale.total || 0), 0);
+  const monthDiscounts = monthSales.reduce((sum, sale) => sum + (sale.discount || 0), 0);
+  const netToday = Math.max(0, todayRevenue - todayRefunds + todayExtra);
 
-  const todayReturnedValue = Number(todayReturnsAgg._sum.returnedValue ?? 0);
-  const todayRefundTotal = Number(todayReturnsAgg._sum.refundAmount ?? 0);
-  const todayExtraAmount = Number(todayReturnsAgg._sum.extraAmount ?? 0);
+  const dailyBuckets = new Map<string, number>();
+  for (const sale of monthSales) {
+    const key = new Intl.DateTimeFormat("ar-EG", { day: "2-digit", month: "2-digit" }).format(sale.createdAt);
+    dailyBuckets.set(key, (dailyBuckets.get(key) ?? 0) + (sale.total || 0));
+  }
+  const revenueSeries = Array.from(dailyBuckets.entries()).slice(-10);
+  const maxRevenue = Math.max(1, ...revenueSeries.map(([, value]) => value));
 
-  const allSalesTotal = Number(totalSalesAgg._sum.total ?? 0);
-  const allDiscountsTotal = Number(totalSalesAgg._sum.discount ?? 0);
+  const sellerMap = new Map<string, { name: string; total: number; invoices: number }>();
+  for (const sale of monthSales) {
+    const name = sale.seller.fullName || sale.seller.username;
+    const current = sellerMap.get(name) ?? { name, total: 0, invoices: 0 };
+    current.total += sale.total || 0;
+    current.invoices += 1;
+    sellerMap.set(name, current);
+  }
+  const sellers = Array.from(sellerMap.values()).sort((a, b) => b.total - a.total).slice(0, 5);
+  const topSellerTotal = Math.max(1, ...sellers.map((seller) => seller.total));
+
+  const hourCounts = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    count: todaySales.filter((sale) => new Date(sale.createdAt).getHours() === hour).length,
+  }));
+  const maxHour = Math.max(1, ...hourCounts.map((row) => row.count));
 
   return (
-    <div className="min-h-screen bg-black text-white" dir="rtl">
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold text-white">التقارير</h1>
-            <p className="mt-1 text-sm text-white/60">
-              OWNER only — مسجل الدخول: {user.fullName || user.username}
-            </p>
-          </div>
+    <CommandShell active="reports" user={user}>
+      <div className="mx-auto max-w-7xl space-y-8">
+        <PageHeader
+          eyebrow="تحليلات المالك"
+          title="التقارير"
+          description="لوحة تحليل حقيقية للمبيعات والخصومات والمرتجعات وحركة الفواتير، بدون بيانات وهمية وبدون كشف أرقام الربح إلا داخل صفحات المالك."
+          actions={
+            <>
+              <BackToDashboard />
+              <Link href="/reports/profit" className="command-primary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
+                تقرير الأرباح
+              </Link>
+            </>
+          }
+        />
 
-          <Link
-            href="/dashboard"
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-          >
-            رجوع
-          </Link>
-        </div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="صافي حركة اليوم" value={formatEGP(netToday)} meta={`${todaySales.length} فاتورة اليوم`} tone="red" />
+          <MetricCard label="إيراد الشهر" value={formatEGP(monthRevenue)} meta={`${monthSales.length} فاتورة منذ بداية الشهر`} tone="blue" />
+          <MetricCard label="خصومات الشهر" value={formatEGP(monthDiscounts)} meta={`خصومات اليوم ${formatEGP(todayDiscounts)}`} />
+          <MetricCard label="مرتجعات اليوم" value={formatEGP(todayRefunds)} meta={`${todayReturns.length} عملية مرتجع / استبدال`} tone="red" />
+        </section>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-sm text-white/60">مبيعات اليوم</div>
-            <div className="mt-2 text-3xl font-extrabold">{todaySalesCount}</div>
-            <div className="mt-2 text-xs text-white/40">عدد الفواتير اليوم</div>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
-            <div className="text-sm text-emerald-200">إجمالي بيع اليوم</div>
-            <div className="mt-2 text-2xl font-extrabold text-emerald-300">
-              {formatEGP(todaySalesTotal)}
-            </div>
-            <div className="mt-2 text-xs text-white/40">إجمالي الفواتير اليوم</div>
-          </div>
-
-          <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-5">
-            <div className="text-sm text-yellow-200">خصومات اليوم</div>
-            <div className="mt-2 text-2xl font-extrabold text-yellow-300">
-              {formatEGP(todayDiscountTotal)}
-            </div>
-            <div className="mt-2 text-xs text-white/40">إجمالي الخصومات اليوم</div>
-          </div>
-
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5">
-            <div className="text-sm text-red-200">عمليات مرتجع اليوم</div>
-            <div className="mt-2 text-3xl font-extrabold text-red-300">
-              {todayReturnsCount}
-            </div>
-            <div className="mt-2 text-xs text-white/40">مرتجع + استبدال</div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-sm text-white/60">فواتير عليها مرتجعات</div>
-            <div className="mt-2 text-3xl font-extrabold">{invoicesWithReturnsCount}</div>
-            <div className="mt-2 text-xs text-white/40">من بداية التشغيل</div>
-          </div>
-        </div>
-
-        <div className="mb-8 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-sm text-white/60">صافي المرتجع اليوم</div>
-            <div className="mt-2 text-2xl font-extrabold">{formatEGP(todayReturnedValue)}</div>
-            <div className="mt-2 text-xs text-white/40">
-              بعد توزيع الخصم على الجزء المرتجع
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-5">
-            <div className="text-sm text-emerald-200">المبالغ المستردة اليوم</div>
-            <div className="mt-2 text-2xl font-extrabold text-emerald-300">
-              {formatEGP(todayRefundTotal)}
-            </div>
-            <div className="mt-2 text-xs text-white/40">فلوس رجعت للعميل</div>
-          </div>
-
-          <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-5">
-            <div className="text-sm text-yellow-200">إضافي على العملاء اليوم</div>
-            <div className="mt-2 text-2xl font-extrabold text-yellow-300">
-              {formatEGP(todayExtraAmount)}
-            </div>
-            <div className="mt-2 text-xs text-white/40">فرق الاستبدال المدفوع</div>
-          </div>
-        </div>
-
-        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-sm text-white/60">إجمالي الفواتير</div>
-            <div className="mt-2 text-3xl font-extrabold">{totalSalesCount}</div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-sm text-white/60">إجمالي المبيعات</div>
-            <div className="mt-2 text-2xl font-extrabold">{formatEGP(allSalesTotal)}</div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-sm text-white/60">إجمالي الخصومات</div>
-            <div className="mt-2 text-2xl font-extrabold">{formatEGP(allDiscountsTotal)}</div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-sm text-white/60">إجمالي المرتجعات</div>
-            <div className="mt-2 text-3xl font-extrabold">{totalReturnsCount}</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Link
-            href="/reports/profit"
-            className="block rounded-2xl border border-red-500/20 bg-red-600/10 p-5 transition hover:bg-red-600/15"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-lg font-bold text-white">تقرير الأرباح</div>
-              <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white">
-                Profit
-              </span>
-            </div>
-
-            <p className="mt-2 text-sm text-white/70">
-              أرباح كل بائع + إجمالي الإيراد + الخصم + صافي الربح.
-            </p>
-
-            <div className="mt-4 text-sm text-red-300">اضغط للدخول →</div>
-          </Link>
-
-          <Link
-            href="/returns"
-            className="block rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:bg-white/10"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-lg font-bold text-white">مراجعة المرتجعات</div>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">
-                Returns
-              </span>
-            </div>
-
-            <p className="mt-2 text-sm text-white/70">
-              عرض كل عمليات المرتجع والاستبدال والبحث داخلها بسرعة.
-            </p>
-
-            <div className="mt-4 text-sm text-red-300">اضغط للدخول →</div>
-          </Link>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-lg font-bold text-white">إحصاءات عامة</div>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">
-                Summary
-              </span>
-            </div>
-
-            <div className="mt-4 space-y-3 text-sm text-white/75">
-              <div className="flex items-center justify-between">
-                <span>إجمالي المنتجات</span>
-                <span className="font-bold">{totalProductsCount}</span>
+        <section className="grid gap-6 xl:grid-cols-3">
+          <div className="command-panel-high p-6 xl:col-span-2">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <div className="command-label">منحنى الإيراد</div>
+                <h2 className="mt-2 text-xl font-black text-white">مبيعات آخر أيام في الشهر</h2>
               </div>
-
-              <div className="flex items-center justify-between">
-                <span>منخفض المخزون</span>
-                <span className="font-bold">{lowStockCount}</span>
+              <StatusBadge tone="blue">بيانات فعلية</StatusBadge>
+            </div>
+            {revenueSeries.length === 0 ? (
+              <EmptyState>لا توجد مبيعات كافية لعرض الرسم.</EmptyState>
+            ) : (
+              <div className="flex h-72 items-end gap-3 border-b border-white/10 px-2">
+                {revenueSeries.map(([label, value]) => (
+                  <div key={label} className="flex h-full flex-1 flex-col justify-end gap-3">
+                    <div className="flex min-h-6 items-end justify-center text-[10px] font-black text-white/50">
+                      {formatEGP(value)}
+                    </div>
+                    <div
+                      className="bg-gradient-to-t from-[var(--primary)] to-[var(--primary-soft)] shadow-[0_0_18px_rgba(229,9,20,0.18)]"
+                      style={{ height: `${Math.max(6, percent(value, maxRevenue))}%` }}
+                    />
+                    <div className="pb-3 text-center text-[10px] font-bold text-white/45">{label}</div>
+                  </div>
+                ))}
               </div>
+            )}
+          </div>
 
-              <div className="flex items-center justify-between">
-                <span>فواتير بها مرتجع</span>
-                <span className="font-bold">{invoicesWithReturnsCount}</span>
+          <div className="command-panel-high p-6">
+            <div className="command-label">أداء البائعين</div>
+            <h2 className="mt-2 text-xl font-black text-white">ترتيب الشهر</h2>
+            <div className="mt-6 space-y-5">
+              {sellers.length === 0 ? (
+                <EmptyState>لا توجد مبيعات للبائعين هذا الشهر.</EmptyState>
+              ) : (
+                sellers.map((seller, index) => (
+                  <div key={seller.name} className="space-y-2">
+                    <div className="flex items-center justify-between gap-4 text-sm">
+                      <span className="font-black text-white">{index + 1}. {seller.name}</span>
+                      <span className="text-white/60">{formatEGP(seller.total)}</span>
+                    </div>
+                    <ProgressBar value={percent(seller.total, topSellerTotal)} tone={index === 0 ? "red" : "blue"} />
+                    <div className="text-[10px] font-bold text-white/42">{seller.invoices} فاتورة</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-3">
+          <div className="command-panel-high p-6 xl:col-span-2">
+            <div className="command-label">كثافة الحركة</div>
+            <h2 className="mt-2 text-xl font-black text-white">توزيع فواتير اليوم بالساعة</h2>
+            <div className="mt-6 grid grid-cols-12 gap-1 md:grid-cols-[repeat(24,minmax(0,1fr))]">
+              {hourCounts.map((row) => (
+                <div key={row.hour} className="space-y-2">
+                  <div
+                    className="h-8 bg-[var(--primary)]"
+                    style={{ opacity: row.count ? Math.max(0.18, row.count / maxHour) : 0.08 }}
+                    title={`${row.hour}:00 - ${row.count}`}
+                  />
+                  <div className="text-center text-[9px] font-bold text-white/35">{row.hour}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="command-panel-high p-6">
+            <div className="command-label">مؤشرات تشغيلية</div>
+            <div className="mt-5 space-y-4">
+              <div className="flex items-center justify-between bg-black/20 px-4 py-3">
+                <span className="text-sm text-white/58">إجمالي المنتجات</span>
+                <span className="font-black text-white">{productCount}</span>
+              </div>
+              <div className="flex items-center justify-between bg-black/20 px-4 py-3">
+                <span className="text-sm text-white/58">منخفض المخزون</span>
+                <span className="font-black text-white">{lowStockCount}</span>
+              </div>
+              <div className="flex items-center justify-between bg-black/20 px-4 py-3">
+                <span className="text-sm text-white/58">فواتير بها مرتجع</span>
+                <span className="font-black text-white">{invoicesWithReturns}</span>
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
+        <section className="command-panel overflow-hidden">
+          <div className="bg-[var(--surface-lowest)] px-5 py-4">
+            <div className="command-label">سجل الحركة</div>
+            <h2 className="mt-1 text-lg font-black text-white">آخر الفواتير والمرتجعات</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="command-table min-w-[1050px] text-right text-sm">
+              <thead>
+                <tr>
+                  <th>الوقت</th>
+                  <th>المرجع</th>
+                  <th>الطرف</th>
+                  <th>النوع</th>
+                  <th>القيمة</th>
+                  <th>الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...recentSales.map((sale) => ({
+                  id: sale.id,
+                  at: sale.createdAt,
+                  person: sale.customer || sale.seller.fullName || sale.seller.username,
+                  kind: "فاتورة",
+                  value: sale.total || 0,
+                  status: sale.returns.length ? "بها مرتجع" : "مكتملة",
+                })), ...recentReturns.map((row) => ({
+                  id: row.id,
+                  at: row.createdAt,
+                  person: row.sale.customer || row.createdBy.fullName || row.createdBy.username,
+                  kind: row.type === "EXCHANGE" ? "استبدال" : "استرداد",
+                  value: row.refundAmount || row.extraAmount || row.returnedValue,
+                  status: "مسجلة",
+                }))].sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 10).map((row) => (
+                  <tr key={`${row.kind}-${row.id}`}>
+                    <td className="text-white/58">{formatCairoDateTime(row.at)}</td>
+                    <td className="max-w-[220px] break-all font-mono text-xs font-bold text-white">{row.id}</td>
+                    <td className="text-white/70">{row.person || "-"}</td>
+                    <td><StatusBadge tone={row.kind === "فاتورة" ? "blue" : "red"}>{row.kind}</StatusBadge></td>
+                    <td className="font-black text-white">{formatEGP(row.value)}</td>
+                    <td className="text-white/60">{row.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
-    </div>
+    </CommandShell>
   );
 }

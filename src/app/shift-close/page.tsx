@@ -1,37 +1,11 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
+import CommandShell from "@/components/CommandShell";
+import { BackToDashboard, EmptyState, MetricCard, PageHeader, ProgressBar, StatusBadge } from "@/components/CommandUI";
+import { formatCairoDate, formatCairoDateTime, getCairoDayRange, getShiftAutoCloseLabel } from "@/lib/cairo-time";
 import { prisma } from "@/lib/prisma";
-import * as rbac from "@/lib/rbac";
-import {
-  formatCairoDate,
-  formatCairoDateTime,
-  getCairoDayRange,
-  getShiftAutoCloseLabel,
-} from "@/lib/cairo-time";
+import { requireUser } from "@/lib/rbac";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-
-async function getCurrentUser() {
-  const requireUser = (rbac as any).requireUser;
-  if (typeof requireUser === "function") {
-    try {
-      return await requireUser();
-    } catch {
-      return null;
-    }
-  }
-
-  const getSessionUser =
-    (rbac as any).getCurrentUser ??
-    (rbac as any).getSessionUser ??
-    (rbac as any).getUserFromSession;
-
-  if (typeof getSessionUser === "function") {
-    return await getSessionUser();
-  }
-
-  return null;
-}
 
 async function endShiftAction() {
   "use server";
@@ -46,208 +20,222 @@ function formatEGP(value: number) {
   }).format(Number.isFinite(value) ? value : 0);
 }
 
-export default async function ShiftClosePage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+function pct(value: number, max: number) {
+  if (!max) return 0;
+  return Math.min(100, Math.round((value / max) * 100));
+}
 
+export default async function ShiftClosePage() {
+  const user = await requireUser();
   const range = getCairoDayRange();
 
   const [sales, returns] = await Promise.all([
     prisma.sale.findMany({
-      where: {
-        createdAt: {
-          gte: range.start,
-          lt: range.end,
-        },
-      },
-      include: {
-        seller: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
-          },
-        },
-      },
+      where: { createdAt: { gte: range.start, lt: range.end } },
+      include: { seller: { select: { id: true, username: true, fullName: true } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.saleReturn.findMany({
-      where: {
-        createdAt: {
-          gte: range.start,
-          lt: range.end,
-        },
-      },
+      where: { createdAt: { gte: range.start, lt: range.end } },
+      include: { createdBy: { select: { username: true, fullName: true } }, sale: { select: { id: true, customer: true } } },
       orderBy: { createdAt: "desc" },
     }),
   ]);
 
   const totalSales = sales.reduce((sum, sale) => sum + (sale.total || 0), 0);
   const totalDiscounts = sales.reduce((sum, sale) => sum + (sale.discount || 0), 0);
-  const totalReturns = returns.reduce((sum, ret) => sum + (ret.refundAmount || 0), 0);
+  const totalReturns = returns.reduce((sum, row) => sum + (row.refundAmount || 0), 0);
+  const totalExtra = returns.reduce((sum, row) => sum + (row.extraAmount || 0), 0);
+  const cashTotal = sales.filter((sale) => sale.paymentMethod === "CASH").reduce((sum, sale) => sum + (sale.total || 0), 0);
+  const transferTotal = sales.filter((sale) => sale.paymentMethod === "TRANSFER").reduce((sum, sale) => sum + (sale.total || 0), 0);
+  const ledgerNet = Math.max(0, totalSales - totalReturns + totalExtra);
 
-  const sellersMap = new Map<
-    string,
-    { name: string; invoices: number; total: number }
-  >();
-
-  for (const sale of sales) {
-    const key = sale.sellerId;
-    const name = sale.seller?.fullName || sale.seller?.username || "مستخدم";
-
-    if (!sellersMap.has(key)) {
-      sellersMap.set(key, {
-        name,
+  const sellers = Array.from(
+    sales.reduce((map, sale) => {
+      const key = sale.sellerId;
+      const current = map.get(key) ?? {
+        name: sale.seller?.fullName || sale.seller?.username || "مستخدم",
         invoices: 0,
         total: 0,
-      });
-    }
+      };
+      current.invoices += 1;
+      current.total += sale.total || 0;
+      map.set(key, current);
+      return map;
+    }, new Map<string, { name: string; invoices: number; total: number }>())
+  )
+    .map(([, value]) => value)
+    .sort((a, b) => b.total - a.total);
 
-    const current = sellersMap.get(key)!;
-    current.invoices += 1;
-    current.total += sale.total || 0;
-  }
-
-  const sellers = Array.from(sellersMap.values()).sort((a, b) => b.total - a.total);
+  const sellerMax = Math.max(1, ...sellers.map((seller) => seller.total));
 
   return (
-    <main dir="rtl" className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <Link
-            href="/dashboard"
-            className="inline-flex h-11 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold text-white transition hover:bg-white/10"
-          >
-            رجوع للداشبورد
-          </Link>
+    <CommandShell active="shift" user={user}>
+      <div className="mx-auto max-w-7xl space-y-8">
+        <PageHeader
+          eyebrow="بروتوكول الإغلاق"
+          title="إنهاء الشيفت"
+          description="مراجعة نهائية لحركة اليوم حسب توقيت القاهرة: الفواتير، النقدي، التحويلات، الخصومات، المرتجعات، ونشاط البائعين قبل الرجوع للوحة التحكم."
+          actions={<BackToDashboard />}
+        />
 
-          <div className="rounded-full border border-red-500/30 bg-red-600/10 px-4 py-2 text-sm font-bold text-red-200">
-            الإغلاق اليومي الموصى به: {getShiftAutoCloseLabel()}
-          </div>
-        </div>
-
-        <section className="mb-8 rounded-[28px] border border-red-500/20 bg-gradient-to-b from-red-950/20 to-white/[0.02] p-5">
-          <h1 className="text-3xl font-black">إنهاء الشيفت</h1>
-          <p className="mt-2 text-sm text-white/60">
-            هذه الصفحة تعرض ملخص اليوم الحالي حسب توقيت القاهرة. إنهاء الشيفت هنا
-            هو إغلاق تشغيلي ومراجعة نهائية لليوم.
-          </p>
-          <div className="mt-4 inline-flex rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold">
-            تاريخ اليوم: {formatCairoDate(new Date())}
-          </div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="صافي دفتر اليوم" value={formatEGP(ledgerNet)} meta={`إغلاق مقترح ${getShiftAutoCloseLabel()}`} tone="red" />
+          <MetricCard label="عدد الفواتير" value={sales.length} meta={formatCairoDate(new Date())} />
+          <MetricCard label="النقدي" value={formatEGP(cashTotal)} meta="من طرق الدفع المسجلة" tone="blue" />
+          <MetricCard label="التحويلات" value={formatEGP(transferTotal)} meta="تحويل / محافظ حسب الفاتورة" />
         </section>
 
-        <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="text-sm text-white/60">عدد الفواتير اليوم</div>
-            <div className="mt-3 text-3xl font-black">{sales.length}</div>
-          </div>
-
-          <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5">
-            <div className="text-sm text-emerald-100/80">إجمالي المبيعات</div>
-            <div className="mt-3 text-3xl font-black text-emerald-300">
-              {formatEGP(totalSales)}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-5">
-            <div className="text-sm text-yellow-100/80">إجمالي الخصومات</div>
-            <div className="mt-3 text-3xl font-black text-yellow-300">
-              {formatEGP(totalDiscounts)}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-5">
-            <div className="text-sm text-red-100/80">إجمالي المرتجعات</div>
-            <div className="mt-3 text-3xl font-black text-red-300">
-              {formatEGP(totalReturns)}
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="mb-5 text-2xl font-extrabold">حركة اليوم</h2>
-
-          {sales.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-8 text-center text-white/60">
-              لا توجد فواتير اليوم.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-[900px] w-full text-right">
-                <thead className="bg-white/[0.03] text-sm text-white/70">
-                  <tr>
-                    <th className="px-4 py-4">رقم الفاتورة</th>
-                    <th className="px-4 py-4">الوقت</th>
-                    <th className="px-4 py-4">العميل</th>
-                    <th className="px-4 py-4">البائع</th>
-                    <th className="px-4 py-4">الإجمالي</th>
-                    <th className="px-4 py-4">الخصم</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sales.map((sale) => (
-                    <tr key={sale.id} className="border-t border-white/10">
-                      <td className="px-4 py-4 font-bold">{sale.id}</td>
-                      <td className="px-4 py-4">{formatCairoDateTime(sale.createdAt)}</td>
-                      <td className="px-4 py-4">{sale.customer || "عميل نقدي"}</td>
-                      <td className="px-4 py-4">
-                        {sale.seller?.fullName || sale.seller?.username || "-"}
-                      </td>
-                      <td className="px-4 py-4">{formatEGP(sale.total || 0)}</td>
-                      <td className="px-4 py-4">{formatEGP(sale.discount || 0)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <section className="mb-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="mb-5 text-2xl font-extrabold">أداء البائعين اليوم</h2>
-
-          {sellers.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-8 text-center text-white/60">
-              لا توجد حركة بيع اليوم.
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {sellers.map((seller, idx) => (
-                <div
-                  key={`${seller.name}-${idx}`}
-                  className="rounded-2xl border border-white/10 bg-black/30 p-5"
-                >
-                  <div className="text-lg font-extrabold">{seller.name}</div>
-                  <div className="mt-3 text-sm text-white/60">
-                    عدد الفواتير: <span className="font-black text-white">{seller.invoices}</span>
+        <section className="grid gap-6 xl:grid-cols-12">
+          <div className="space-y-6 xl:col-span-5">
+            <div className="command-panel-high border-r-4 border-[var(--primary)] p-6">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-black text-white">ملخص الشيفت</h2>
+                <StatusBadge tone="red">نشط</StatusBadge>
+              </div>
+              <div className="space-y-4">
+                {[
+                  ["إجمالي المبيعات", formatEGP(totalSales)],
+                  ["إجمالي الخصومات", formatEGP(totalDiscounts)],
+                  ["المبالغ المستردة", formatEGP(totalReturns)],
+                  ["فروق الاستبدال المدفوعة", formatEGP(totalExtra)],
+                  ["صافي دفتر اليوم", formatEGP(ledgerNet)],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between border-b border-white/[0.055] py-3">
+                    <span className="text-sm font-semibold text-white/58">{label}</span>
+                    <span className="font-mono text-sm font-black text-white">{value}</span>
                   </div>
-                  <div className="mt-2 text-sm text-white/60">
-                    إجمالي البيع: <span className="font-black text-white">{formatEGP(seller.total)}</span>
-                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="command-panel-high p-6">
+              <div className="command-label">خط سير اليوم</div>
+              <div className="mt-6 space-y-6">
+                <div className="relative pr-8">
+                  <span className="absolute right-0 top-1 h-3 w-3 rounded-full bg-[var(--tertiary)]" />
+                  <p className="text-sm font-black text-white">بداية يوم القاهرة</p>
+                  <p className="mt-1 text-xs text-white/50">{formatCairoDateTime(range.start)}</p>
                 </div>
-              ))}
+                <div className="relative pr-8">
+                  <span className="absolute right-0 top-1 h-3 w-3 rounded-full bg-[var(--primary)]" />
+                  <p className="text-sm font-black text-white">آخر فاتورة مسجلة</p>
+                  <p className="mt-1 text-xs text-white/50">{sales[0] ? formatCairoDateTime(sales[0].createdAt) : "لا توجد فواتير اليوم"}</p>
+                </div>
+                <div className="relative pr-8">
+                  <span className="absolute right-0 top-1 h-3 w-3 rounded-full bg-white/30" />
+                  <p className="text-sm font-black text-white">موعد الإغلاق المقترح</p>
+                  <p className="mt-1 text-xs text-white/50">{getShiftAutoCloseLabel()}</p>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
+
+          <div className="command-panel-high p-6 xl:col-span-7">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <div className="command-label">مطابقة الدفع</div>
+                <h2 className="mt-2 text-2xl font-black text-white">تسوية النقدي والتحويل</h2>
+              </div>
+              <div className="text-left">
+                <div className="command-label">الإجمالي الدفتري</div>
+                <div className="mt-2 text-3xl font-black text-[var(--primary-soft)]">{formatEGP(ledgerNet)}</div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="bg-black/20 p-5">
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="text-white/58">نقدي</span>
+                  <span className="font-black text-white">{formatEGP(cashTotal)}</span>
+                </div>
+                <ProgressBar value={pct(cashTotal, Math.max(totalSales, 1))} tone="red" />
+              </div>
+              <div className="bg-black/20 p-5">
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="text-white/58">تحويل</span>
+                  <span className="font-black text-white">{formatEGP(transferTotal)}</span>
+                </div>
+                <ProgressBar value={pct(transferTotal, Math.max(totalSales, 1))} tone="blue" />
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <div className="command-label">أداء البائعين اليوم</div>
+              <div className="mt-5 space-y-4">
+                {sellers.length === 0 ? (
+                  <EmptyState>لا توجد حركة بيع اليوم.</EmptyState>
+                ) : (
+                  sellers.map((seller) => (
+                    <div key={seller.name} className="bg-black/20 p-4">
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span className="font-black text-white">{seller.name}</span>
+                        <span className="text-white/60">{formatEGP(seller.total)} / {seller.invoices} فاتورة</span>
+                      </div>
+                      <ProgressBar value={pct(seller.total, sellerMax)} tone="red" />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         </section>
 
-        <section className="rounded-[28px] border border-red-500/20 bg-gradient-to-b from-red-950/20 to-white/[0.02] p-5">
-          <h2 className="text-2xl font-extrabold">تأكيد إنهاء الشيفت</h2>
-          <p className="mt-2 text-sm text-white/60">
-            جميع بيانات البيع محفوظة بالفعل داخل النظام. هذا الإجراء هو إنهاء تشغيلي
-            والرجوع إلى لوحة التحكم بعد مراجعة الملخص.
-          </p>
+        <section className="command-panel overflow-hidden">
+          <div className="bg-[var(--surface-lowest)] px-5 py-4">
+            <div className="command-label">سجل اليوم</div>
+            <h2 className="mt-1 text-lg font-black text-white">آخر الفواتير والمرتجعات</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="command-table min-w-[1000px] text-right text-sm">
+              <thead>
+                <tr>
+                  <th>الوقت</th>
+                  <th>المرجع</th>
+                  <th>النوع</th>
+                  <th>الطرف</th>
+                  <th>القيمة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...sales.map((sale) => ({
+                  id: sale.id,
+                  at: sale.createdAt,
+                  type: "فاتورة",
+                  person: sale.customer || sale.seller?.fullName || sale.seller?.username || "-",
+                  value: sale.total || 0,
+                })), ...returns.map((row) => ({
+                  id: row.id,
+                  at: row.createdAt,
+                  type: row.type === "EXCHANGE" ? "استبدال" : "استرداد",
+                  person: row.sale.customer || row.createdBy.fullName || row.createdBy.username,
+                  value: row.refundAmount || row.extraAmount || row.returnedValue,
+                }))].sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 10).map((row) => (
+                  <tr key={`${row.type}-${row.id}`}>
+                    <td className="text-white/58">{formatCairoDateTime(row.at)}</td>
+                    <td className="max-w-[220px] break-all font-mono text-xs font-bold text-white">{row.id}</td>
+                    <td><StatusBadge tone={row.type === "فاتورة" ? "blue" : "red"}>{row.type}</StatusBadge></td>
+                    <td className="text-white/70">{row.person}</td>
+                    <td className="font-black text-white">{formatEGP(row.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
+        <section className="command-panel-high border-r-4 border-[var(--primary)] p-6">
+          <h2 className="text-2xl font-black text-white">تأكيد إنهاء الشيفت</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-white/58">
+            لا يتم إنشاء سجل شيفت جديد لأن قاعدة البيانات الحالية لا تحتوي على جدول شيفت. هذا الإجراء يحافظ على السلوك الحالي: مراجعة تشغيلية ثم الرجوع للوحة التحكم.
+          </p>
           <form action={endShiftAction} className="mt-5">
-            <button
-              type="submit"
-              className="rounded-2xl bg-red-600 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-red-500"
-            >
+            <button className="command-primary px-8 py-4 text-xs font-black uppercase tracking-[0.14em]">
               إنهاء الشيفت الآن
             </button>
           </form>
         </section>
       </div>
-    </main>
+    </CommandShell>
   );
 }

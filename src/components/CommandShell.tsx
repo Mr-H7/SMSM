@@ -13,18 +13,18 @@ type CommandShellProps = {
 };
 
 const baseItems = [
-  { id: "dashboard", href: "/dashboard", label: "Dashboard", mark: "DB" },
-  { id: "pos", href: "/sales/new", label: "POS", mark: "PS" },
-  { id: "products", href: "/products", label: "Products", mark: "IN" },
-  { id: "invoices", href: "/invoices", label: "Invoices", mark: "RC" },
-  { id: "returns", href: "/returns", label: "Returns", mark: "RT" },
-  { id: "shift", href: "/shift-close", label: "Shift Close", mark: "SC" },
+  { id: "dashboard", href: "/dashboard", label: "لوحة التحكم", mark: "لو" },
+  { id: "pos", href: "/sales/new", label: "البيع", mark: "بي" },
+  { id: "products", href: "/products", label: "المنتجات", mark: "مخ" },
+  { id: "invoices", href: "/invoices", label: "الفواتير", mark: "فو" },
+  { id: "returns", href: "/returns", label: "المرتجعات", mark: "مر" },
+  { id: "shift", href: "/shift-close", label: "إنهاء الشيفت", mark: "ش" },
 ] as const;
 
 const ownerItems = [
-  { id: "reports", href: "/reports", label: "Reports", mark: "RP" },
-  { id: "targets", href: "/targets", label: "Targets", mark: "TG" },
-  { id: "users", href: "/users", label: "Users", mark: "US" },
+  { id: "reports", href: "/reports", label: "التقارير", mark: "تق" },
+  { id: "targets", href: "/targets", label: "الأهداف", mark: "أه" },
+  { id: "users", href: "/users", label: "المستخدمون", mark: "مس" },
 ] as const;
 
 export default function CommandShell({ active, user, children }: CommandShellProps) {
@@ -40,14 +40,14 @@ export default function CommandShell({ active, user, children }: CommandShellPro
   const navItems = isOwner ? [...baseItems, ...ownerItems] : baseItems;
 
   return (
-    <div className="command-shell min-h-screen text-[var(--foreground)]" dir="ltr">
-      <aside className="command-sidebar fixed inset-y-0 left-0 z-50 hidden w-64 flex-col px-4 py-6 lg:flex">
+    <div className="command-shell min-h-screen text-[var(--foreground)]" dir="rtl">
+      <aside className="command-sidebar fixed inset-y-0 right-0 z-50 hidden w-64 flex-col px-4 py-6 lg:flex">
         <div className="mb-10 px-4">
-          <div className="text-xl font-black uppercase tracking-tight text-[var(--foreground)]">
-            SMSM Store
+          <div className="text-xl font-black tracking-tight text-[var(--foreground)]">
+            متجر SMSM
           </div>
-          <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/40">
-            Command Center
+          <div className="mt-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+            OBSIDIAN COMMAND
           </div>
         </div>
 
@@ -60,7 +60,7 @@ export default function CommandShell({ active, user, children }: CommandShellPro
                 href={item.href}
                 className={`flex items-center gap-3 rounded-sm px-4 py-3 text-sm transition ${
                   isActive
-                    ? "border-l-4 border-[var(--primary)] bg-white/[0.055] font-bold text-[var(--primary)]"
+                    ? "border-r-4 border-[var(--primary)] bg-white/[0.055] font-bold text-[var(--primary)]"
                     : "text-white/55 hover:bg-white/[0.045] hover:text-white"
                 }`}
               >
@@ -85,7 +85,7 @@ export default function CommandShell({ active, user, children }: CommandShellPro
             <div className="min-w-0">
               <div className="truncate text-xs font-black text-white">{displayName}</div>
               <div className="mt-1 text-[10px] uppercase tracking-[0.16em] text-[var(--primary-soft)]">
-                {role || "ACTIVE"}
+                {role === "OWNER" ? "مالك" : role === "SELLER" ? "بائع" : "نشط"}
               </div>
             </div>
           </div>
@@ -93,30 +93,30 @@ export default function CommandShell({ active, user, children }: CommandShellPro
             href="/logout"
             className="command-secondary mt-4 flex h-9 items-center justify-center text-xs font-black uppercase tracking-[0.12em]"
           >
-            Sign Out
+            تسجيل الخروج
           </Link>
         </div>
       </aside>
 
-      <div className="command-content lg:pl-64">
+      <div className="command-content lg:pr-64">
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-white/[0.055] bg-[#131313]/85 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <form action="/products" method="get" className="relative w-full max-w-md">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-white/35">
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-white/35">
               /
             </span>
             <input
               name="q"
-              placeholder="Quick find product, SKU or category..."
+              placeholder="بحث سريع عن منتج أو SKU أو تصنيف..."
               className="command-input h-10 w-full px-9 text-sm placeholder:text-white/30"
             />
           </form>
 
-          <div className="ml-4 flex items-center gap-4">
+          <div className="mr-4 flex items-center gap-4">
             <div className="hidden h-6 w-px bg-white/[0.06] sm:block" />
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-[var(--primary)] shadow-[0_0_18px_rgba(229,9,20,0.8)]" />
               <span className="text-xs font-black uppercase tracking-[0.14em] text-white/72">
-                Live Store
+                المتجر يعمل
               </span>
             </div>
           </div>

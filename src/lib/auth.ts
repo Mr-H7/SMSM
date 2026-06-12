@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "smsm_session";
@@ -19,6 +19,38 @@ function timingSafeEqualHex(aHex: string, bHex: string) {
   const b = Buffer.from(bHex, "hex");
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
+}
+
+async function shouldUseSecureCookie() {
+  const h = await headers();
+  const host = h.get("host") ?? "";
+  const forwardedProto = h.get("x-forwarded-proto") ?? "";
+  const forwarded = h.get("forwarded") ?? "";
+  const forwardedSsl = h.get("x-forwarded-ssl") ?? "";
+
+  if (
+    host.startsWith("localhost") ||
+    host.startsWith("127.0.0.1") ||
+    host.startsWith("[::1]")
+  ) {
+    return false;
+  }
+
+  return (
+    forwardedProto.split(",")[0]?.trim().toLowerCase() === "https" ||
+    forwarded.toLowerCase().includes("proto=https") ||
+    forwardedSsl.toLowerCase() === "on"
+  );
+}
+
+async function sessionCookieOptions(expires: Date) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: await shouldUseSecureCookie(),
+    path: "/",
+    expires,
+  };
 }
 
 /**
@@ -89,24 +121,12 @@ export async function createSession(userId: string, days = 30) {
   const value = `${base}.${sig}`;
 
   const jar = await cookies();
-  jar.set(COOKIE_NAME, value, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: new Date(expiresAt),
-  });
+  jar.set(COOKIE_NAME, value, await sessionCookieOptions(new Date(expiresAt)));
 }
 
 export async function destroySession() {
   const jar = await cookies();
-  jar.set(COOKIE_NAME, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: new Date(0),
-  });
+  jar.set(COOKIE_NAME, "", await sessionCookieOptions(new Date(0)));
 }
 
 function parseSession(raw: string | undefined | null) {

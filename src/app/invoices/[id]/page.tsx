@@ -8,11 +8,11 @@ import PrintButton from "./PrintButton";
 import { addDays, formatCairoDate, formatCairoDateTime } from "@/lib/cairo-time";
 
 function money(n: number) {
-  return new Intl.NumberFormat("en-EG", { maximumFractionDigits: 0 }).format(n || 0);
+  return new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 }).format(n || 0);
 }
 
 function getCustomerName(sale: any) {
-  return sale.customer || "Walk-in customer";
+  return sale.customer || "عميل مباشر";
 }
 
 function getItemQty(item: any) {
@@ -106,20 +106,20 @@ export default async function InvoiceDetailsPage({ params }: { params: Promise<{
       <div className="mx-auto max-w-5xl space-y-6 print:max-w-none">
         <div className="print-hidden flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="command-label">Thermal receipt</div>
+            <div className="command-label">إيصال حراري</div>
             <h1 className="mt-2 text-2xl font-black uppercase tracking-tight text-white">
-              Invoice Detail
+              تفاصيل الفاتورة
             </h1>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/invoices" className="command-secondary px-4 py-3 text-xs font-black uppercase tracking-[0.12em]">
-              Back
+              رجوع
             </Link>
             <Link
               href={`/returns?q=${encodeURIComponent(sale.id)}`}
               className={hasReturns ? "command-primary px-4 py-3 text-xs font-black uppercase tracking-[0.12em]" : "command-secondary px-4 py-3 text-xs font-black uppercase tracking-[0.12em]"}
             >
-              Return / Exchange
+              مرتجع / استبدال
             </Link>
             <PrintButton />
           </div>
@@ -127,21 +127,21 @@ export default async function InvoiceDetailsPage({ params }: { params: Promise<{
 
         <div className="command-panel-high print-hidden grid gap-4 p-4 md:grid-cols-4">
           <div>
-            <div className="command-label">Invoice</div>
+            <div className="command-label">الفاتورة</div>
             <div className="mt-2 break-all font-mono text-xs font-black text-white">{sale.id}</div>
           </div>
           <div>
-            <div className="command-label">Payment</div>
+            <div className="command-label">الدفع</div>
             <div className="mt-2 text-sm font-black text-white">
-              {sale.paymentMethod === "TRANSFER" ? "Transfer" : "Cash"}
+              {sale.paymentMethod === "TRANSFER" ? "تحويل" : "نقدي"}
             </div>
           </div>
           <div>
-            <div className="command-label">Total</div>
+            <div className="command-label">الإجمالي</div>
             <div className="mt-2 text-lg font-black text-white">{money(finalTotal)} EGP</div>
           </div>
           <div>
-            <div className="command-label">Returns</div>
+            <div className="command-label">المرتجعات</div>
             <div className="mt-2 text-lg font-black text-white">{sale.returns.length}</div>
           </div>
         </div>
@@ -161,34 +161,34 @@ export default async function InvoiceDetailsPage({ params }: { params: Promise<{
             </div>
             <h2 className="text-xl font-black tracking-wide">SMSM STORE</h2>
             <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-neutral-500">
-              Sales Receipt
+              فاتورة بيع
             </p>
           </header>
 
           <section className="space-y-2 border-b border-neutral-200 px-4 py-4 text-[12px]">
             <div className="flex items-start justify-between gap-3">
-              <span className="text-neutral-500">Invoice ID</span>
+              <span className="text-neutral-500">رقم الفاتورة</span>
               <span className="max-w-[176px] break-all text-left font-black">{sale.id}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-neutral-500">Cairo Time</span>
+              <span className="text-neutral-500">توقيت القاهرة</span>
               <span className="font-black">{formatCairoDateTime(sale.createdAt)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-neutral-500">Customer</span>
+              <span className="text-neutral-500">العميل</span>
               <span className="font-black">{getCustomerName(sale)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-neutral-500">Seller</span>
+              <span className="text-neutral-500">البائع</span>
               <span className="font-black">{sale.seller?.fullName || sale.seller?.username || "-"}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-neutral-500">Payment</span>
-              <span className="font-black">{sale.paymentMethod === "TRANSFER" ? "Transfer" : "Cash"}</span>
+              <span className="text-neutral-500">الدفع</span>
+              <span className="font-black">{sale.paymentMethod === "TRANSFER" ? "تحويل" : "نقدي"}</span>
             </div>
             {sale.paymentMethod === "TRANSFER" && sale.paymentDescription ? (
               <div className="flex items-start justify-between gap-3">
-                <span className="shrink-0 text-neutral-500">Transfer</span>
+                <span className="shrink-0 text-neutral-500">التحويل</span>
                 <span className="max-w-[176px] break-all text-left font-black">{sale.paymentDescription}</span>
               </div>
             ) : null}
@@ -196,23 +196,23 @@ export default async function InvoiceDetailsPage({ params }: { params: Promise<{
 
           <section className="px-4 py-4">
             <div className="mb-3 border-b border-dashed border-neutral-300 pb-2 text-center text-[12px] font-black uppercase tracking-[0.12em]">
-              Items
+              المنتجات
             </div>
             <div className="space-y-3">
               {sale.items.map((item: any, index: number) => (
                 <div key={item.id ?? index} className="border-b border-dashed border-neutral-200 pb-3 text-[12px] last:border-b-0">
-                  <div className="font-black leading-5">{itemTitle(item) || "Product"}</div>
+                  <div className="font-black leading-5">{itemTitle(item) || "منتج"}</div>
                   <div className="mt-2 space-y-1 text-neutral-600">
                     <div className="flex items-center justify-between">
-                      <span>Qty</span>
+                      <span>الكمية</span>
                       <span>{getItemQty(item)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Unit</span>
+                      <span>الوحدة</span>
                       <span>{money(getItemPrice(item))} EGP</span>
                     </div>
                     <div className="flex items-center justify-between font-black text-black">
-                      <span>Line</span>
+                      <span>السطر</span>
                       <span>{money(getItemTotal(item))} EGP</span>
                     </div>
                   </div>
@@ -224,20 +224,20 @@ export default async function InvoiceDetailsPage({ params }: { params: Promise<{
           <section className="border-t border-neutral-200 px-4 py-4 text-[12px]">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-neutral-600">Items Subtotal</span>
+                <span className="text-neutral-600">إجمالي المنتجات</span>
                 <span className="font-black">{money(itemsSubtotal)} EGP</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-neutral-600">Discount</span>
+                <span className="text-neutral-600">الخصم</span>
                 <span className="font-black">{money(discount)} EGP</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-neutral-600">Returns Total</span>
+                <span className="text-neutral-600">إجمالي المرتجعات</span>
                 <span className="font-black">{money(totalReturnedAmount)} EGP</span>
               </div>
               <div className="mt-3 border-t border-dashed border-neutral-300 pt-3">
                 <div className="flex items-center justify-between text-base font-black">
-                  <span>Final Total</span>
+                  <span>الإجمالي النهائي</span>
                   <span>{money(finalTotal)} EGP</span>
                 </div>
               </div>
@@ -247,21 +247,21 @@ export default async function InvoiceDetailsPage({ params }: { params: Promise<{
           {hasReturns ? (
             <section className="border-t border-neutral-200 px-4 py-4">
               <div className="mb-3 text-center text-[12px] font-black uppercase tracking-[0.12em]">
-                Returns / Exchanges
+                المرتجعات / الاستبدالات
               </div>
               <div className="space-y-3">
                 {sale.returns.map((ret: any) => (
                   <div key={ret.id} className="border border-neutral-200 bg-neutral-50 p-3 text-[12px]">
                     <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className="font-black">{ret.type === "EXCHANGE" ? "Exchange" : "Refund"}</span>
+                      <span className="font-black">{ret.type === "EXCHANGE" ? "استبدال" : "استرداد"}</span>
                       <span className="text-[10px] text-neutral-500">{formatCairoDateTime(ret.createdAt)}</span>
                     </div>
                     <div className="flex items-center justify-between text-neutral-600">
-                      <span>Refund</span>
+                      <span>استرداد</span>
                       <span>{money(ret.refundAmount || 0)} EGP</span>
                     </div>
                     <div className="flex items-center justify-between text-neutral-600">
-                      <span>Extra</span>
+                      <span>فرق</span>
                       <span>{money(ret.extraAmount || 0)} EGP</span>
                     </div>
                   </div>
@@ -271,13 +271,13 @@ export default async function InvoiceDetailsPage({ params }: { params: Promise<{
           ) : null}
 
           <section className="border-t border-neutral-200 bg-neutral-950 px-4 py-3 text-center text-[11px] font-bold leading-5 text-white">
-            Return deadline: <span className="font-black">{formatCairoDate(returnLastDate)}</span>
+            آخر موعد للمرتجع: <span className="font-black">{formatCairoDate(returnLastDate)}</span>
           </section>
 
           <footer className="border-t border-neutral-200 px-4 py-4 text-center text-[11px] leading-5 text-neutral-500">
-            Thank you for shopping with SMSM.
+            شكرًا لتسوقك من SMSM.
             <br />
-            Please keep this receipt until the return deadline.
+            احتفظ بهذه الفاتورة حتى آخر موعد للمرتجع.
           </footer>
         </article>
       </div>

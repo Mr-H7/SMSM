@@ -23,7 +23,7 @@ type CartItem = {
 type PaymentMethod = "CASH" | "TRANSFER";
 
 function formatEGP(value: number) {
-  return new Intl.NumberFormat("en-EG", {
+  return new Intl.NumberFormat("ar-EG", {
     style: "currency",
     currency: "EGP",
     maximumFractionDigits: 0,
@@ -133,12 +133,12 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
     setError(null);
 
     if (cart.length === 0) {
-      setError("Cart is empty.");
+      setError("السلة فارغة.");
       return;
     }
 
     if (paymentMethod === "TRANSFER" && !paymentDescription.trim()) {
-      setError("Transfer details are required for transfer payments.");
+      setError("تفاصيل التحويل مطلوبة عند اختيار الدفع بالتحويل.");
       return;
     }
 
@@ -155,10 +155,10 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
         if (res?.ok) {
           router.push(`/invoices/${res.saleId}`);
         } else {
-          setError("Unexpected sale error.");
+          setError("حدث خطأ غير متوقع أثناء البيع.");
         }
       } catch (e: any) {
-        setError(e?.message ?? "Sale execution failed.");
+        setError(e?.message ?? "فشل تنفيذ عملية البيع.");
       }
     });
   }
@@ -167,47 +167,47 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
     <div className="mx-auto max-w-7xl space-y-6">
       <section className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="command-label">Point of sale</div>
+          <div className="command-label">نقطة البيع</div>
           <h1 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">
-            Fast Checkout
+            بيع سريع
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-white/55">
-            Search inventory, select quantities, capture payment details, and issue a thermal receipt without exposing cost data.
+            ابحث في المخزون، اختر الكميات، سجل بيانات الدفع، وأصدر فاتورة حرارية بدون كشف بيانات التكلفة.
           </p>
         </div>
         <div className="command-panel px-4 py-3 text-right">
-          <div className="command-label">Live total</div>
+          <div className="command-label">الإجمالي الحالي</div>
           <div className="mt-1 text-2xl font-black text-white">{formatEGP(total)}</div>
         </div>
       </section>
 
       <section className="command-panel-high grid gap-3 p-4 lg:grid-cols-12">
         <div className="lg:col-span-6">
-          <label className="command-label mb-2 block">Search</label>
+          <label className="command-label mb-2 block">بحث</label>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Name, brand, SKU, color, size..."
+            placeholder="الاسم، الماركة، SKU، اللون، المقاس..."
             className="command-input h-12 w-full px-4 text-sm placeholder:text-white/30"
           />
         </div>
         <div className="lg:col-span-3">
-          <label className="command-label mb-2 block">Exact price</label>
+          <label className="command-label mb-2 block">سعر محدد</label>
           <input
             value={exactPrice}
             onChange={(e) => setExactPrice(e.target.value)}
-            placeholder="Example: 600"
+            placeholder="مثال: 600"
             className="command-input h-12 w-full px-4 text-sm placeholder:text-white/30"
           />
         </div>
         <div className="lg:col-span-3">
-          <label className="command-label mb-2 block">Grade</label>
+          <label className="command-label mb-2 block">التصنيف</label>
           <select
             value={grade}
             onChange={(e) => setGrade(e.target.value as any)}
             className="command-input h-12 w-full px-4 text-sm"
           >
-            <option value="" className="bg-[#201f1f]">All Grades</option>
+            <option value="" className="bg-[#201f1f]">كل التصنيفات</option>
             <option value="ORIGINAL" className="bg-[#201f1f]">ORIGINAL</option>
             <option value="MIRROR" className="bg-[#201f1f]">MIRROR</option>
             <option value="EGYPTIAN" className="bg-[#201f1f]">EGYPTIAN</option>
@@ -219,27 +219,27 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
         <section className="command-panel overflow-hidden xl:col-span-8">
           <div className="flex items-center justify-between bg-[var(--surface-lowest)] px-5 py-4">
             <div>
-              <div className="command-label">Product selection</div>
+              <div className="command-label">اختيار المنتجات</div>
               <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">
-                Sellable Inventory
+                مخزون قابل للبيع
               </h2>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/42">
-              {filtered.length} visible
+              {filtered.length} ظاهر
             </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="command-table min-w-[980px] text-left text-sm">
+            <table className="command-table min-w-[980px] text-right text-sm">
               <thead>
                 <tr>
-                  <th>Product</th>
-                  <th>Grade</th>
-                  <th>Retail</th>
-                  <th>Stock</th>
-                  <th>Size</th>
-                  <th>Color</th>
-                  <th>Qty</th>
+                  <th>المنتج</th>
+                  <th>التصنيف</th>
+                  <th>سعر البيع</th>
+                  <th>المخزون</th>
+                  <th>المقاس</th>
+                  <th>اللون</th>
+                  <th>الكمية</th>
                   <th></th>
                 </tr>
               </thead>
@@ -247,7 +247,7 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-white/42">
-                      No products match the current search.
+                      لا توجد منتجات مطابقة للبحث الحالي.
                     </td>
                   </tr>
                 ) : (
@@ -267,7 +267,7 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
                         </td>
                         <td className="font-black text-white">{formatEGP(v.sellPrice)}</td>
                         <td>
-                          <span className={`command-badge ${stockBadge(v.stockQty)}`}>{v.stockQty} left</span>
+                          <span className={`command-badge ${stockBadge(v.stockQty)}`}>{v.stockQty} متاح</span>
                         </td>
                         <td className="text-white/65">{v.size ?? "-"}</td>
                         <td className="text-white/65">{v.color ?? "-"}</td>
@@ -306,7 +306,7 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
                             disabled={v.stockQty <= 0 || qty >= v.stockQty}
                             className="command-primary h-9 px-4 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35"
                           >
-                            Add
+                            إضافة
                           </button>
                         </td>
                       </tr>
@@ -322,9 +322,9 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
           <section className="command-panel-high p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <div className="command-label">Current cart</div>
+                <div className="command-label">السلة الحالية</div>
                 <h2 className="mt-1 text-lg font-black uppercase tracking-tight text-white">
-                  Ticket Build
+                  تكوين الفاتورة
                 </h2>
               </div>
               <button
@@ -333,14 +333,14 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
                 disabled={isPending || cart.length === 0}
                 className="command-secondary px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] disabled:opacity-35"
               >
-                Clear
+                مسح
               </button>
             </div>
 
             <div className="max-h-[310px] space-y-2 overflow-y-auto pr-1">
               {cartRows.length === 0 ? (
                 <div className="bg-black/20 px-4 py-8 text-center text-sm text-white/42">
-                  No items selected.
+                  لم يتم اختيار منتجات.
                 </div>
               ) : (
                 cartRows.map((row) => (
@@ -349,7 +349,7 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
                       <div>
                         <div className="text-sm font-black text-white">{productName(row.variant)}</div>
                         <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/42">
-                          Qty {row.qty} x {formatEGP(row.variant.sellPrice)}
+                          الكمية {row.qty} x {formatEGP(row.variant.sellPrice)}
                         </div>
                       </div>
                       <div className="font-black text-white">{formatEGP(row.lineTotal)}</div>
@@ -361,20 +361,20 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
           </section>
 
           <section className="command-panel-high p-5">
-            <div className="command-label">Checkout controls</div>
+            <div className="command-label">تحكم الدفع</div>
             <div className="mt-4 grid gap-3">
               <label className="grid gap-2">
-                <span className="command-label">Customer</span>
+                <span className="command-label">العميل</span>
                 <input
                   value={customer}
                   onChange={(e) => setCustomer(e.target.value)}
-                  placeholder="Optional customer name"
+                  placeholder="اسم العميل اختياري"
                   className="command-input h-12 px-4 text-sm placeholder:text-white/30"
                 />
               </label>
 
               <label className="grid gap-2">
-                <span className="command-label">Discount</span>
+                <span className="command-label">الخصم</span>
                 <input
                   type="number"
                   value={discount}
@@ -384,25 +384,25 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
               </label>
 
               <label className="grid gap-2">
-                <span className="command-label">Payment method</span>
+                <span className="command-label">طريقة الدفع</span>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
                   className="command-input h-12 px-4 text-sm"
                 >
-                  <option value="CASH" className="bg-[#201f1f]">Cash</option>
-                  <option value="TRANSFER" className="bg-[#201f1f]">Transfer</option>
+                  <option value="CASH" className="bg-[#201f1f]">نقدي</option>
+                  <option value="TRANSFER" className="bg-[#201f1f]">تحويل</option>
                 </select>
               </label>
 
               {paymentMethod === "TRANSFER" ? (
                 <label className="grid gap-2">
-                  <span className="command-label">Transfer details</span>
+                  <span className="command-label">تفاصيل التحويل</span>
                   <textarea
                     value={paymentDescription}
                     onChange={(e) => setPaymentDescription(e.target.value)}
                     rows={3}
-                    placeholder="Wallet, bank, reference number, sender name..."
+                    placeholder="محفظة، بنك، رقم مرجعي، اسم المرسل..."
                     className="command-input px-4 py-3 text-sm placeholder:text-white/30"
                   />
                 </label>
@@ -419,16 +419,16 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
           <section className="command-panel-high p-5">
             <div className="space-y-3 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-white/55">Subtotal</span>
+                <span className="text-white/55">الإجمالي قبل الخصم</span>
                 <span className="font-black text-white">{formatEGP(subtotal)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-white/55">Discount</span>
+                <span className="text-white/55">الخصم</span>
                 <span className="font-black text-white">{formatEGP(safeDiscount)}</span>
               </div>
               <div className="h-px bg-white/[0.06]" />
               <div className="flex items-end justify-between">
-                <span className="command-label">Final total</span>
+                <span className="command-label">الإجمالي النهائي</span>
                 <span className="text-3xl font-black text-white">{formatEGP(total)}</span>
               </div>
             </div>
@@ -439,11 +439,11 @@ export default function SalesNewClient({ variants }: { variants: VariantRow[] })
               disabled={isPending}
               className="command-primary mt-5 h-12 w-full text-xs font-black uppercase tracking-[0.12em] disabled:opacity-45"
             >
-              {isPending ? "Processing..." : "Complete Sale"}
+              {isPending ? "جاري التنفيذ..." : "إتمام البيع"}
             </button>
 
             <p className="mt-3 text-[11px] leading-5 text-white/38">
-              Cost and profit data are not shown in POS. The server keeps the cost snapshot for authorized reports only.
+              بيانات التكلفة والربح لا تظهر في POS. الخادم يحتفظ بلقطة التكلفة للتقارير المصرح بها فقط.
             </p>
           </section>
         </aside>

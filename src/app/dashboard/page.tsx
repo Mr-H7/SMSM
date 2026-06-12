@@ -14,7 +14,7 @@ import {
 export const dynamic = "force-dynamic";
 
 function formatEGP(value: number) {
-  return new Intl.NumberFormat("en-EG", {
+  return new Intl.NumberFormat("ar-EG", {
     style: "currency",
     currency: "EGP",
     maximumFractionDigits: 0,
@@ -22,9 +22,9 @@ function formatEGP(value: number) {
 }
 
 function metricTone(tone: "red" | "blue" | "neutral") {
-  if (tone === "red") return "border-l-4 border-[var(--primary)]";
-  if (tone === "blue") return "border-l-4 border-[var(--tertiary)]";
-  return "border-l-4 border-white/10";
+  if (tone === "red") return "border-r-4 border-[var(--primary)]";
+  if (tone === "blue") return "border-r-4 border-[var(--tertiary)]";
+  return "border-r-4 border-white/10";
 }
 
 export default async function DashboardPage() {
@@ -77,27 +77,27 @@ export default async function DashboardPage() {
 
   const metrics = [
     {
-      label: "Today Sales",
+      label: "مبيعات اليوم",
       value: formatEGP(todaySalesValue),
-      meta: `${todaySales.length} invoices today`,
+      meta: `${todaySales.length} فاتورة اليوم`,
       tone: "red" as const,
     },
     {
-      label: "Inventory Variants",
+      label: "أصناف المخزون",
       value: productsCount.toLocaleString("en-US"),
-      meta: `${lowStockCount} low stock alerts`,
+      meta: `${lowStockCount} تنبيه مخزون منخفض`,
       tone: "neutral" as const,
     },
     {
-      label: "Out Of Stock",
+      label: "نافد من المخزون",
       value: outOfStockCount.toLocaleString("en-US"),
-      meta: "Requires restock action",
+      meta: "يحتاج إعادة توريد",
       tone: "red" as const,
     },
     {
-      label: "Returns Today",
+      label: "مرتجعات اليوم",
       value: formatEGP(todayReturnsValue),
-      meta: `${todayReturns.length} return records`,
+      meta: `${todayReturns.length} عملية مرتجع`,
       tone: "blue" as const,
     },
   ];
@@ -107,24 +107,24 @@ export default async function DashboardPage() {
       <div className="mx-auto max-w-7xl space-y-8">
         <section className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="command-label">Retail operating system</div>
+            <div className="command-label">نظام تشغيل المتجر</div>
             <h1 className="mt-2 text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">
-              SMSM Command Center
+              لوحة تحكم SMSM
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-white/55">
-              Live store operations, inventory pressure, invoice movement, and shift status using current production data.
+              متابعة مباشرة لحركة البيع والمخزون والفواتير والشيفت من بيانات التشغيل الفعلية.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <Link href="/sales/new" className="command-primary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
-              New Sale
+              بيع جديد
             </Link>
             <Link href="/products" className="command-secondary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
-              Inventory Hub
+              مركز المخزون
             </Link>
             <Link href="/shift-close" className="command-secondary px-5 py-3 text-xs font-black uppercase tracking-[0.12em]">
-              Shift Close
+              إنهاء الشيفت
             </Link>
           </div>
         </section>
@@ -144,13 +144,13 @@ export default async function DashboardPage() {
           <div className="command-panel-high p-5 xl:col-span-2">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <div className="command-label">Recent activity</div>
+                <div className="command-label">آخر الحركة</div>
                 <h2 className="mt-2 text-xl font-black uppercase tracking-tight text-white">
-                  Latest Invoices
+                  آخر الفواتير
                 </h2>
               </div>
               <Link href="/invoices" className="text-xs font-black uppercase tracking-[0.12em] text-[var(--primary-soft)] hover:text-white">
-                View All
+                عرض الكل
               </Link>
             </div>
 
@@ -158,17 +158,17 @@ export default async function DashboardPage() {
               <table className="command-table min-w-[760px] text-left text-sm">
                 <thead>
                   <tr>
-                    <th>Invoice</th>
-                    <th>Seller</th>
-                    <th>Time</th>
-                    <th className="text-right">Total</th>
+                    <th>الفاتورة</th>
+                    <th>البائع</th>
+                    <th>الوقت</th>
+                    <th className="text-left">الإجمالي</th>
                   </tr>
                 </thead>
                 <tbody>
                   {todaySales.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="py-12 text-center text-white/42">
-                        No invoices recorded for the current Cairo business day.
+                        لا توجد فواتير مسجلة في يوم القاهرة الحالي.
                       </td>
                     </tr>
                   ) : (
@@ -181,7 +181,7 @@ export default async function DashboardPage() {
                         </td>
                         <td className="text-white/70">{sale.seller?.fullName || sale.seller?.username || "-"}</td>
                         <td className="text-white/55">{formatCairoDateTime(sale.createdAt)}</td>
-                        <td className="text-right font-black text-white">{formatEGP(sale.total || 0)}</td>
+                        <td className="text-left font-black text-white">{formatEGP(sale.total || 0)}</td>
                       </tr>
                     ))
                   )}
@@ -191,28 +191,28 @@ export default async function DashboardPage() {
           </div>
 
           <div className="space-y-6">
-            <div className={`command-panel-high p-5 ${afterAutoClose ? "border-l-4 border-[var(--primary)]" : "border-l-4 border-[var(--tertiary)]"}`}>
-              <div className="command-label">Shift pulse</div>
+            <div className={`command-panel-high p-5 ${afterAutoClose ? "border-r-4 border-[var(--primary)]" : "border-r-4 border-[var(--tertiary)]"}`}>
+              <div className="command-label">نبض الشيفت</div>
               <h2 className="mt-2 text-xl font-black uppercase tracking-tight text-white">
-                {afterAutoClose ? "Close Required" : "Open Window"}
+                {afterAutoClose ? "الإغلاق مطلوب" : "نافذة العمل مفتوحة"}
               </h2>
               <p className="mt-3 text-sm leading-6 text-white/60">
                 {afterAutoClose
-                  ? `Auto-close time ${getShiftAutoCloseLabel()} has passed. Review and close the shift.`
-                  : `Shift remains operational until ${getShiftAutoCloseLabel()}.`}
+                  ? `وقت الإغلاق ${getShiftAutoCloseLabel()} عدى. راجع الحركة وأنهِ الشيفت.`
+                  : `الشيفت مستمر حتى ${getShiftAutoCloseLabel()}.`}
               </p>
-              <div className="mt-4 text-xs font-bold text-white/45">Cairo date: {formatCairoDate(new Date())}</div>
+              <div className="mt-4 text-xs font-bold text-white/45">تاريخ القاهرة: {formatCairoDate(new Date())}</div>
             </div>
 
             <div className="command-panel-high p-5">
-              <div className="command-label">Operational summary</div>
+              <div className="command-label">ملخص التشغيل</div>
               <div className="mt-4 space-y-3">
                 {[
-                  ["Total invoices", invoicesCount],
-                  ["Total returns", totalReturnsCount],
-                  ["Users", usersCount],
-                  ["Discounts today", formatEGP(todayDiscounts)],
-                  ["Current role", role || "-"],
+                  ["إجمالي الفواتير", invoicesCount],
+                  ["إجمالي المرتجعات", totalReturnsCount],
+                  ["المستخدمون", usersCount],
+                  ["خصومات اليوم", formatEGP(todayDiscounts)],
+                  ["الدور الحالي", role === "OWNER" ? "مالك" : role === "SELLER" ? "بائع" : "-"],
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-center justify-between bg-black/20 px-4 py-3">
                     <span className="text-sm text-white/58">{label}</span>
@@ -227,20 +227,20 @@ export default async function DashboardPage() {
         <section className="command-panel-high p-5">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <div className="command-label">Inventory alerts</div>
+              <div className="command-label">تنبيهات المخزون</div>
               <h2 className="mt-2 text-xl font-black uppercase tracking-tight text-white">
-                Stock Pressure
+                ضغط المخزون
               </h2>
             </div>
             <span className="command-badge bg-[var(--primary)]/15 text-[var(--primary-soft)]">
-              {alertVariants.length} active alerts
+              {alertVariants.length} تنبيه نشط
             </span>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {alertVariants.length === 0 ? (
               <div className="col-span-full bg-black/20 px-4 py-8 text-center text-sm text-white/45">
-                No low-stock products are currently visible.
+                لا توجد منتجات منخفضة المخزون حالياً.
               </div>
             ) : (
               alertVariants.map((variant) => (
@@ -259,7 +259,7 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                     <span className="command-badge bg-[var(--primary)]/15 text-[var(--primary-soft)]">
-                      {variant.stockQty} left
+                      متبقي {variant.stockQty}
                     </span>
                   </div>
                 </Link>

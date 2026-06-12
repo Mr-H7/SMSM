@@ -1,172 +1,16 @@
-import { prisma } from "@/lib/prisma";
-import * as rbac from "@/lib/rbac";
+import CommandShell from "@/components/CommandShell";
+import { BackToDashboard, MetricCard, PageHeader, ProgressBar, StatusBadge } from "@/components/CommandUI";
 import { hashPassword } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { requireOwner } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
-
-type ModelField = {
-  name: string;
-  kind?: string;
-  type?: string;
-  isId?: boolean;
-};
-
-type ModelInfo = {
-  name: string;
-  delegate: string;
-  fields: ModelField[];
-};
-
-function normalize(value: string) {
-  return value.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-}
-
-function lowerCamel(value: string) {
-  return value.length ? value[0].toLowerCase() + value.slice(1) : value;
-}
-
-function getRuntimeModels(client: any): Record<string, any> {
-  if (client?._runtimeDataModel?.models) return client._runtimeDataModel.models;
-  if (client?._baseDmmf?.modelMap) return client._baseDmmf.modelMap;
-
-  const models = client?._dmmf?.datamodel?.models;
-  if (Array.isArray(models)) {
-    return Object.fromEntries(models.map((m: any) => [m.name, m]));
-  }
-
-  return {};
-}
-
-function getModelFields(meta: any): ModelField[] {
-  if (!meta) return [];
-  if (Array.isArray(meta.fields)) return meta.fields;
-  if (meta.fields && typeof meta.fields === "object") return Object.values(meta.fields);
-  return [];
-}
-
-function findModelInfo(client: any, candidates: string[]): ModelInfo | null {
-  const runtimeModels = getRuntimeModels(client);
-  const delegateKeys = Object.keys(client).filter((key) => {
-    const value = client[key];
-    return value && typeof value.findMany === "function";
-  });
-
-  for (const [modelName, meta] of Object.entries(runtimeModels)) {
-    const match = candidates.some((candidate) => {
-      const a = normalize(candidate);
-      const b = normalize(String(modelName));
-      return a === b || a.includes(b) || b.includes(a);
-    });
-
-    if (!match) continue;
-
-    const delegate =
-      delegateKeys.find((key) => normalize(key) === normalize(lowerCamel(String(modelName)))) ??
-      delegateKeys.find((key) => normalize(key) === normalize(String(modelName))) ??
-      lowerCamel(String(modelName));
-
-    if (client[delegate] && typeof client[delegate].findMany === "function") {
-      return {
-        name: String(modelName),
-        delegate,
-        fields: getModelFields(meta),
-      };
-    }
-  }
-
-  for (const candidate of candidates) {
-    const delegate =
-      delegateKeys.find((key) => normalize(key) === normalize(candidate)) ??
-      delegateKeys.find((key) => normalize(key) === normalize(lowerCamel(candidate)));
-
-    if (delegate) {
-      return {
-        name: candidate,
-        delegate,
-        fields: [],
-      };
-    }
-  }
-
-  return null;
-}
-
-function pickField(model: ModelInfo | null, candidates: string[]) {
-  if (!model) return null;
-  return (
-    model.fields.find((field) =>
-      candidates.some((candidate) => normalize(candidate) === normalize(field.name))
-    ) ?? null
-  );
-}
-
-function getValue(obj: any, keys: Array<string | undefined | null>, fallback: any = "") {
-  for (const key of keys) {
-    if (!key) continue;
-    if (obj && obj[key] !== undefined && obj[key] !== null) return obj[key];
-  }
-  return fallback;
-}
-
-function coerceByField(value: unknown, field?: ModelField | null) {
-  if (!field) return value;
-  const type = String(field.type ?? "").toLowerCase();
-  if (["int", "bigint", "float", "decimal"].includes(type)) return Number(value);
-  if (type === "boolean") return value === true || value === "true" || value === "1" || value === 1;
-  return value;
-}
-
-async function ensureOwner() {
-  const requireOwner = (rbac as any).requireOwner;
-  if (typeof requireOwner === "function") {
-    await requireOwner();
-    return;
-  }
-
-  const requireUser = (rbac as any).requireUser;
-  if (typeof requireUser === "function") {
-    const user = await requireUser();
-    const role = String(user?.role ?? user?.userRole ?? "").toUpperCase();
-    if (role !== "OWNER") {
-      throw new Error("غير مصرح");
-    }
-    return;
-  }
-
-  throw new Error("غير مصرح");
-}
-
-function getAdapter() {
-  const client: any = prisma as any;
-  const userModel = findModelInfo(client, ["User", "AppUser"]);
-
-  const userIdField =
-    pickField(userModel, ["id", "userId"]) ??
-    userModel?.fields.find((f) => f.isId) ??
-    null;
-
-  return {
-    client,
-    userModel,
-    userIdField,
-    usernameField: pickField(userModel, ["username", "name", "fullName"]),
-    fullNameField: pickField(userModel, ["fullName"]),
-    passwordField: pickField(userModel, ["passwordHash", "password", "hash"]),
-    roleField: pickField(userModel, ["role", "userRole"]),
-    activeField: pickField(userModel, ["isActive", "active", "enabled"]),
-    createdAtField: pickField(userModel, ["createdAt"]),
-  };
-}
 
 async function createUserAction(formData: FormData) {
   "use server";
 
-  await ensureOwner();
-
-  const adapter = getAdapter();
-  if (!adapter.userModel) return;
+  await requireOwner();
 
   const username = String(formData.get("username") ?? "").trim();
   const fullName = String(formData.get("fullName") ?? "").trim();
@@ -175,358 +19,201 @@ async function createUserAction(formData: FormData) {
 
   if (!username || !password || (role !== "SELLER" && role !== "OWNER")) return;
 
-  const existing = await adapter.client[adapter.userModel.delegate].findFirst({
-    where: adapter.usernameField
-      ? { [adapter.usernameField.name]: username }
-      : undefined,
+  const existing = await prisma.user.findUnique({ where: { username } });
+  if (existing) return;
+
+  await prisma.user.create({
+    data: {
+      username,
+      fullName: fullName || null,
+      passwordHash: hashPassword(password),
+      role: role as "SELLER" | "OWNER",
+      isActive: true,
+    },
   });
 
-  if (existing) {
-    revalidatePath("/users");
-    return;
-  }
-
-  const passwordHash = await hashPassword(password);
-
-  const data: Record<string, any> = {};
-  if (adapter.usernameField) data[adapter.usernameField.name] = username;
-  if (adapter.fullNameField) data[adapter.fullNameField.name] = fullName || null;
-  if (adapter.passwordField) data[adapter.passwordField.name] = passwordHash;
-  if (adapter.roleField) data[adapter.roleField.name] = role;
-  if (adapter.activeField) data[adapter.activeField.name] = true;
-
-  await adapter.client[adapter.userModel.delegate].create({ data });
   revalidatePath("/users");
 }
 
 async function toggleUserAction(formData: FormData) {
   "use server";
 
-  await ensureOwner();
-
-  const adapter = getAdapter();
-  if (!adapter.userModel || !adapter.userIdField || !adapter.activeField) return;
+  await requireOwner();
 
   const userId = String(formData.get("userId") ?? "").trim();
   const nextActive = String(formData.get("nextActive") ?? "false") === "true";
-
   if (!userId) return;
 
-  const current = await adapter.client[adapter.userModel.delegate].findUnique({
-    where: {
-      [adapter.userIdField.name]: coerceByField(userId, adapter.userIdField),
-    },
-  });
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return;
+  if (user.role === "OWNER" && user.username === "SMSM" && nextActive === false) return;
 
-  if (!current) return;
-
-  const role = String(getValue(current, [adapter.roleField?.name, "role"], "")).toUpperCase();
-  const username = String(getValue(current, [adapter.usernameField?.name, "username"], ""));
-
-  if (role === "OWNER" && username === "SMSM" && nextActive === false) {
-    revalidatePath("/users");
-    return;
-  }
-
-  await adapter.client[adapter.userModel.delegate].update({
-    where: {
-      [adapter.userIdField.name]: coerceByField(userId, adapter.userIdField),
-    },
-    data: {
-      [adapter.activeField.name]: nextActive,
-    },
-  });
-
+  await prisma.user.update({ where: { id: userId }, data: { isActive: nextActive } });
   revalidatePath("/users");
 }
 
 async function resetPasswordAction(formData: FormData) {
   "use server";
 
-  await ensureOwner();
-
-  const adapter = getAdapter();
-  if (!adapter.userModel || !adapter.userIdField || !adapter.passwordField) return;
+  await requireOwner();
 
   const userId = String(formData.get("userId") ?? "").trim();
   const newPassword = String(formData.get("newPassword") ?? "").trim();
-
   if (!userId || !newPassword) return;
 
-  const passwordHash = await hashPassword(newPassword);
-
-  await adapter.client[adapter.userModel.delegate].update({
-    where: {
-      [adapter.userIdField.name]: coerceByField(userId, adapter.userIdField),
-    },
-    data: {
-      [adapter.passwordField.name]: passwordHash,
-    },
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: hashPassword(newPassword) },
   });
 
   revalidatePath("/users");
 }
 
 export default async function UsersPage() {
-  await ensureOwner();
+  const owner = await requireOwner();
+  const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
 
-  const adapter = getAdapter();
-  const users =
-    adapter.userModel
-      ? await adapter.client[adapter.userModel.delegate].findMany({
-          orderBy: adapter.createdAtField?.name
-            ? { [adapter.createdAtField.name]: "desc" }
-            : undefined,
-        })
-      : [];
-
-  const mapped = (Array.isArray(users) ? users : []).map((user: any) => {
-    const role = String(
-      getValue(user, [adapter.roleField?.name, "role", "userRole"], "")
-    ).toUpperCase();
-
-    return {
-      id: String(getValue(user, [adapter.userIdField?.name, "id"], "")),
-      username: String(
-        getValue(user, [adapter.usernameField?.name, "username", "name"], "-")
-      ),
-      fullName: String(getValue(user, [adapter.fullNameField?.name, "fullName"], "")),
-      role,
-      isActive: Boolean(
-        getValue(user, [adapter.activeField?.name, "isActive", "active"], true)
-      ),
-      createdAt: (() => {
-        const d = getValue(user, [adapter.createdAtField?.name, "createdAt"], null);
-        return d ? new Date(d).toLocaleString("ar-EG") : "-";
-      })(),
-    };
-  });
-
-  const owners = mapped.filter((u) => u.role === "OWNER").length;
-  const sellers = mapped.filter((u) => u.role === "SELLER").length;
-  const activeUsers = mapped.filter((u) => u.isActive).length;
-  const inactiveUsers = mapped.filter((u) => !u.isActive).length;
+  const owners = users.filter((user) => user.role === "OWNER").length;
+  const sellers = users.filter((user) => user.role === "SELLER").length;
+  const activeUsers = users.filter((user) => user.isActive).length;
+  const activePct = users.length ? Math.round((activeUsers / users.length) * 100) : 0;
 
   return (
-    <main dir="rtl" className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <Link
-            href="/dashboard"
-            className="inline-flex h-11 items-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-bold text-white transition hover:bg-white/10"
-          >
-            رجوع
-          </Link>
-        </div>
+    <CommandShell active="users" user={owner}>
+      <div className="mx-auto max-w-7xl space-y-8">
+        <PageHeader
+          eyebrow="إدارة الصلاحيات"
+          title="المستخدمون"
+          description="دليل الموظفين الفعلي: إنشاء الحسابات، متابعة الأدوار، تفعيل أو تعطيل البائعين، وإعادة تعيين كلمات المرور بدون عرض أي كلمة مرور."
+          actions={<BackToDashboard />}
+        />
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold tracking-tight">إدارة المستخدمين</h1>
-          <p className="mt-2 text-sm text-white/60">
-            صفحة مالك فقط لإنشاء الحسابات وإدارة التفعيل وإعادة تعيين كلمات المرور والصلاحيات.
-          </p>
-        </div>
-
-        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="text-sm text-white/60">إجمالي المستخدمين</div>
-            <div className="mt-3 text-3xl font-black">{mapped.length}</div>
-          </div>
-
-          <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-5">
-            <div className="text-sm text-red-100/80">المالكون</div>
-            <div className="mt-3 text-3xl font-black text-red-300">{owners}</div>
-          </div>
-
-          <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5">
-            <div className="text-sm text-emerald-100/80">البائعون</div>
-            <div className="mt-3 text-3xl font-black text-emerald-300">{sellers}</div>
-          </div>
-
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="text-sm text-white/60">نشط / غير نشط</div>
-            <div className="mt-3 text-3xl font-black">
-              {activeUsers} / {inactiveUsers}
-            </div>
-          </div>
-        </div>
-
-        <section className="mb-8 rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-          <div className="mb-5">
-            <h2 className="text-xl font-extrabold">إنشاء مستخدم جديد</h2>
-            <p className="mt-1 text-sm text-white/55">
-              يمكنك إنشاء بائع أو مالك جديد بنفس صلاحيات المالك الحالي.
-            </p>
-          </div>
-
-          <form action={createUserAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
-              <span className="mb-2 block text-sm text-white/65">اسم المستخدم</span>
-              <input
-                name="username"
-                required
-                placeholder="اسم الحساب"
-                className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-            </label>
-
-            <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
-              <span className="mb-2 block text-sm text-white/65">الاسم الكامل</span>
-              <input
-                name="fullName"
-                placeholder="الاسم الكامل"
-                className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-            </label>
-
-            <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
-              <span className="mb-2 block text-sm text-white/65">كلمة المرور</span>
-              <input
-                name="password"
-                type="password"
-                required
-                placeholder="كلمة المرور"
-                className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none placeholder:text-white/35 focus:border-red-500/60"
-              />
-            </label>
-
-            <label className="rounded-2xl border border-white/10 bg-black/40 p-4">
-              <span className="mb-2 block text-sm text-white/65">الدور</span>
-              <select
-                name="role"
-                defaultValue="SELLER"
-                className="h-11 w-full rounded-xl border border-white/10 bg-black/50 px-4 outline-none focus:border-red-500/60"
-              >
-                <option value="SELLER" className="bg-black">
-                  بائع
-                </option>
-                <option value="OWNER" className="bg-black">
-                  مالك
-                </option>
-              </select>
-            </label>
-
-            <div className="md:col-span-2 xl:col-span-4">
-              <button className="h-11 w-full rounded-xl bg-red-600 px-6 text-sm font-extrabold transition hover:bg-red-500">
-                إنشاء المستخدم
-              </button>
-            </div>
-          </form>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="إجمالي المستخدمين" value={users.length} meta="حسابات مسجلة في النظام" tone="red" />
+          <MetricCard label="المالكون" value={owners} meta="صلاحيات كاملة" />
+          <MetricCard label="البائعون" value={sellers} meta="تشغيل البيع والفواتير" tone="blue" />
+          <MetricCard label="نسبة النشاط" value={`${activePct}%`} meta={`${activeUsers} نشط من ${users.length}`} tone="red" />
         </section>
 
-        <section className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03]">
-          <div className="border-b border-white/10 px-5 py-4">
-            <h2 className="text-lg font-extrabold">قائمة المستخدمين</h2>
+        <section className="grid gap-6 xl:grid-cols-3">
+          <div className="command-panel-high p-5 xl:col-span-2">
+            <div className="command-label">إنشاء حساب</div>
+            <h2 className="mt-2 text-xl font-black text-white">مستخدم جديد</h2>
+            <form action={createUserAction} className="mt-5 grid gap-3 md:grid-cols-2">
+              <input name="username" required placeholder="اسم المستخدم" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <input name="fullName" placeholder="الاسم الكامل" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <input name="password" type="password" required placeholder="كلمة المرور" className="command-input h-12 px-4 text-sm placeholder:text-white/30" />
+              <select name="role" defaultValue="SELLER" className="command-input h-12 px-4 text-sm">
+                <option value="SELLER" className="bg-[#201f1f]">بائع</option>
+                <option value="OWNER" className="bg-[#201f1f]">مالك</option>
+              </select>
+              <button className="command-primary h-12 text-xs font-black uppercase tracking-[0.12em] md:col-span-2">
+                إنشاء المستخدم
+              </button>
+            </form>
+          </div>
+
+          <div className="command-panel-high p-5">
+            <div className="command-label">نبض الصلاحيات</div>
+            <h2 className="mt-2 text-xl font-black text-white">حالة النظام</h2>
+            <div className="mt-6 space-y-5">
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="text-white/60">الحسابات النشطة</span>
+                  <span className="font-black text-white">{activePct}%</span>
+                </div>
+                <ProgressBar value={activePct} tone="red" />
+              </div>
+              <div className="bg-black/20 p-4 text-sm leading-6 text-white/58">
+                يتم حماية حساب SMSM الرئيسي من التعطيل للحفاظ على دخول المالك للنظام.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="command-panel overflow-hidden">
+          <div className="flex flex-col gap-2 bg-[var(--surface-lowest)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="command-label">دليل الموظفين</div>
+              <h2 className="mt-1 text-lg font-black text-white">قائمة المستخدمين</h2>
+            </div>
+            <StatusBadge tone="blue">بيانات فعلية</StatusBadge>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[1200px] w-full text-right">
-              <thead className="bg-white/[0.03] text-sm text-white/70">
+            <table className="command-table min-w-[1180px] text-right text-sm">
+              <thead>
                 <tr>
-                  <th className="px-4 py-4">اسم المستخدم</th>
-                  <th className="px-4 py-4">الاسم الكامل</th>
-                  <th className="px-4 py-4">الدور</th>
-                  <th className="px-4 py-4">الحالة</th>
-                  <th className="px-4 py-4">تاريخ الإنشاء</th>
-                  <th className="px-4 py-4">إعادة تعيين كلمة المرور</th>
-                  <th className="px-4 py-4">الإجراءات</th>
+                  <th>المستخدم</th>
+                  <th>الدور</th>
+                  <th>الحالة</th>
+                  <th>تاريخ الإنشاء</th>
+                  <th>إعادة كلمة المرور</th>
+                  <th>الإجراءات</th>
                 </tr>
               </thead>
-
               <tbody>
-                {mapped.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center text-sm text-white/45">
-                      لا يوجد مستخدمون.
-                    </td>
-                  </tr>
-                ) : (
-                  mapped.map((user) => {
-                    const isOwner = user.role === "OWNER";
-                    const isMainOwner = user.username === "SMSM" && isOwner;
-
-                    return (
-                      <tr key={user.id} className="border-t border-white/10 align-top">
-                        <td className="px-4 py-4 font-bold">{user.username}</td>
-                        <td className="px-4 py-4 text-white/75">{user.fullName || "-"}</td>
-
-                        <td className="px-4 py-4">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${
-                              isOwner
-                                ? "bg-red-600/20 text-red-200"
-                                : "bg-white/10 text-white/80"
-                            }`}
-                          >
-                            {isOwner ? "مالك" : "بائع"}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold ${
+                {users.map((user) => {
+                  const isOwner = user.role === "OWNER";
+                  const isMainOwner = isOwner && user.username === "SMSM";
+                  return (
+                    <tr key={user.id}>
+                      <td>
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-[var(--surface-highest)] text-xs font-black text-white">
+                            {(user.fullName || user.username).slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-black text-white">{user.fullName || user.username}</div>
+                            <div className="mt-1 font-mono text-[10px] text-white/42">{user.username}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td><StatusBadge tone={isOwner ? "red" : "neutral"}>{isOwner ? "مالك" : "بائع"}</StatusBadge></td>
+                      <td><StatusBadge tone={user.isActive ? "blue" : "neutral"}>{user.isActive ? "نشط" : "غير نشط"}</StatusBadge></td>
+                      <td className="text-white/58">{user.createdAt.toLocaleString("ar-EG")}</td>
+                      <td>
+                        {isMainOwner ? (
+                          <span className="text-sm text-white/35">محمي</span>
+                        ) : (
+                          <form action={resetPasswordAction} className="flex gap-2">
+                            <input type="hidden" name="userId" value={user.id} />
+                            <input
+                              name="newPassword"
+                              type="password"
+                              required
+                              placeholder="كلمة مرور جديدة"
+                              className="command-input h-10 w-48 px-3 text-xs placeholder:text-white/30"
+                            />
+                            <button className="command-secondary h-10 px-4 text-[10px] font-black uppercase tracking-[0.1em]">حفظ</button>
+                          </form>
+                        )}
+                      </td>
+                      <td>
+                        {isMainOwner ? (
+                          <span className="text-sm text-white/35">ثابت</span>
+                        ) : (
+                          <form action={toggleUserAction}>
+                            <input type="hidden" name="userId" value={user.id} />
+                            <input type="hidden" name="nextActive" value={String(!user.isActive)} />
+                            <button className={`h-10 rounded-sm px-4 text-[10px] font-black uppercase tracking-[0.1em] transition ${
                               user.isActive
-                                ? "bg-emerald-500/20 text-emerald-200"
-                                : "bg-white/10 text-white/70"
-                            }`}
-                          >
-                            {user.isActive ? "نشط" : "غير نشط"}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-4 text-white/65">{user.createdAt}</td>
-
-                        <td className="px-4 py-4">
-                          {!isMainOwner ? (
-                            <form action={resetPasswordAction} className="flex gap-2">
-                              <input type="hidden" name="userId" value={user.id} />
-                              <input
-                                name="newPassword"
-                                type="password"
-                                required
-                                placeholder="كلمة مرور جديدة"
-                                className="h-10 w-48 rounded-xl border border-white/10 bg-black/40 px-3 text-sm outline-none placeholder:text-white/35 focus:border-red-500/60"
-                              />
-                              <button className="h-10 rounded-xl bg-white/10 px-4 text-xs font-bold hover:bg-white/15">
-                                حفظ
-                              </button>
-                            </form>
-                          ) : (
-                            <span className="text-sm text-white/35">محمي</span>
-                          )}
-                        </td>
-
-                        <td className="px-4 py-4">
-                          {!isMainOwner ? (
-                            <form action={toggleUserAction}>
-                              <input type="hidden" name="userId" value={user.id} />
-                              <input
-                                type="hidden"
-                                name="nextActive"
-                                value={String(!user.isActive)}
-                              />
-                              <button
-                                className={`h-10 rounded-xl px-4 text-xs font-bold ${
-                                  user.isActive
-                                    ? "bg-yellow-500/20 text-yellow-200 hover:bg-yellow-500/30"
-                                    : "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
-                                }`}
-                              >
-                                {user.isActive ? "تعطيل الحساب" : "تفعيل الحساب"}
-                              </button>
-                            </form>
-                          ) : (
-                            <span className="text-sm text-white/35">ثابت</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                                ? "bg-[var(--primary)]/15 text-[var(--primary-soft)] hover:bg-[var(--primary)]/25"
+                                : "bg-[var(--tertiary)]/12 text-[var(--tertiary)] hover:bg-[var(--tertiary)]/18"
+                            }`}>
+                              {user.isActive ? "تعطيل" : "تفعيل"}
+                            </button>
+                          </form>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </section>
       </div>
-    </main>
+    </CommandShell>
   );
 }
