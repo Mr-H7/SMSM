@@ -4,8 +4,13 @@ import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "smsm_session";
 
+function authLog(event: string, values: Record<string, boolean>) {
+  console.info(`[auth] ${event}`, values);
+}
+
 function getSecret() {
   const s = process.env.SESSION_SECRET;
+  authLog("session_secret", { exists: Boolean(s) });
   if (!s) throw new Error("Missing SESSION_SECRET in .env");
   return s;
 }
@@ -115,13 +120,16 @@ export function verifyPassword(password: string, stored: string): boolean {
  * userId.expiresAt.sig  where sig = HMAC(userId.expiresAt)
  */
 export async function createSession(userId: string, days = 30) {
+  authLog("create_session", { called: true });
   const expiresAt = Date.now() + days * 24 * 60 * 60 * 1000;
   const base = `${userId}.${expiresAt}`;
   const sig = hmac(base);
   const value = `${base}.${sig}`;
+  const options = await sessionCookieOptions(new Date(expiresAt));
+  authLog("cookie_options", { secure: options.secure });
 
   const jar = await cookies();
-  jar.set(COOKIE_NAME, value, await sessionCookieOptions(new Date(expiresAt)));
+  jar.set(COOKIE_NAME, value, options);
 }
 
 export async function destroySession() {
@@ -130,28 +138,55 @@ export async function destroySession() {
 }
 
 function parseSession(raw: string | undefined | null) {
-  if (!raw) return null;
+  if (!raw) {
+    authLog("session_parse", { success: false });
+    authLog("hmac_validation", { success: false });
+    return null;
+  }
   const parts = raw.split(".");
-  if (parts.length !== 3) return null;
+  if (parts.length !== 3) {
+    authLog("session_parse", { success: false });
+    authLog("hmac_validation", { success: false });
+    return null;
+  }
 
   const userId = parts[0];
   const expiresAt = Number(parts[1]);
   const sig = parts[2];
 
-  if (!userId) return null;
-  if (!Number.isFinite(expiresAt)) return null;
-  if (Date.now() > expiresAt) return null;
+  if (!userId) {
+    authLog("session_parse", { success: false });
+    authLog("hmac_validation", { success: false });
+    return null;
+  }
+  if (!Number.isFinite(expiresAt)) {
+    authLog("session_parse", { success: false });
+    authLog("hmac_validation", { success: false });
+    return null;
+  }
+  if (Date.now() > expiresAt) {
+    authLog("session_parse", { success: false });
+    authLog("hmac_validation", { success: false });
+    return null;
+  }
 
   const base = `${userId}.${expiresAt}`;
   const expected = hmac(base);
-  if (!timingSafeEqualHex(expected, sig)) return null;
+  const hmacValid = timingSafeEqualHex(expected, sig);
+  authLog("hmac_validation", { success: hmacValid });
+  if (!hmacValid) {
+    authLog("session_parse", { success: false });
+    return null;
+  }
 
+  authLog("session_parse", { success: true });
   return { userId };
 }
 
 export async function getSessionUser() {
   const jar = await cookies();
   const raw = jar.get(COOKIE_NAME)?.value ?? null;
+  authLog("get_session_user", { cookieExists: Boolean(raw) });
   const parsed = parseSession(raw);
   if (!parsed) return null;
 
