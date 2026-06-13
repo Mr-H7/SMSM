@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
 import { formatCairoDateTime } from "@/lib/cairo-time";
 
+export const dynamic = "force-dynamic";
+
 type SearchParams = { q?: string };
 
 function formatEGP(value: number) {

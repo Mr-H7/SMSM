@@ -7,6 +7,8 @@ import { requireUser } from "@/lib/rbac";
 import PrintButton from "./PrintButton";
 import { addDays, formatCairoDate, formatCairoDateTime } from "@/lib/cairo-time";
 
+export const dynamic = "force-dynamic";
+
 function money(n: number) {
   return new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 }).format(n || 0);
 }

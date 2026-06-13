@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/rbac";
 import CommandShell from "@/components/CommandShell";
 import SalesNewClient from "./SalesNewClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function SalesNewPage() {
   const user = await requireUser();
 
