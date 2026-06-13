@@ -25,15 +25,7 @@ function pct(value: number, target: number) {
 }
 
 export default async function TargetsPage() {
-  console.info("[page-auth] targets", { guard: "requireOwner", called: true });
   const user = await requireOwner();
-  console.info("[page-auth] targets", {
-    userExists: Boolean(user),
-    userIdExists: Boolean(user?.id),
-    userRole: String(user?.role ?? ""),
-    userActive: user?.isActive !== false,
-    pageReachedAfterAuth: true,
-  });
   const today = getCairoDayRange();
   const monthStart = startOfMonth();
 

@@ -58,15 +58,7 @@ export default async function ProductsPage({
 }: {
   searchParams?: Promise<{ q?: string; grade?: string; status?: string }>;
 }) {
-  console.info("[page-auth] products", { guard: "requireUser", called: true });
   const user = await requireUser();
-  console.info("[page-auth] products", {
-    userExists: Boolean(user),
-    userIdExists: Boolean(user?.id),
-    userRole: String(user?.role ?? ""),
-    userActive: user?.isActive !== false,
-    pageReachedAfterAuth: true,
-  });
   const role = String(user?.role ?? "").toUpperCase();
   const isOwner = role === "OWNER";
 

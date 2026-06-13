@@ -26,15 +26,7 @@ function pct(value: number, max: number) {
 }
 
 export default async function ShiftClosePage() {
-  console.info("[page-auth] shift-close", { guard: "requireUser", called: true });
   const user = await requireUser();
-  console.info("[page-auth] shift-close", {
-    userExists: Boolean(user),
-    userIdExists: Boolean(user?.id),
-    userRole: String(user?.role ?? ""),
-    userActive: user?.isActive !== false,
-    pageReachedAfterAuth: true,
-  });
   const range = getCairoDayRange();
 
   const [sales, returns] = await Promise.all([

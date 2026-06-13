@@ -26,15 +26,7 @@ function percent(value: number, max: number) {
 }
 
 export default async function ReportsPage() {
-  console.info("[page-auth] reports", { guard: "requireOwner", called: true });
   const user = await requireOwner();
-  console.info("[page-auth] reports", {
-    userExists: Boolean(user),
-    userIdExists: Boolean(user?.id),
-    userRole: String(user?.role ?? ""),
-    userActive: user?.isActive !== false,
-    pageReachedAfterAuth: true,
-  });
   const today = getCairoDayRange();
   const monthStart = startOfMonth();
 
