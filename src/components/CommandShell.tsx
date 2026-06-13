@@ -90,12 +90,14 @@ export default function CommandShell({ active, user, children }: CommandShellPro
               </div>
             </div>
           </div>
-          <Link
-            href="/logout"
-            className="command-secondary mt-4 flex h-9 items-center justify-center text-xs font-black uppercase tracking-[0.12em]"
-          >
-            تسجيل الخروج
-          </Link>
+          <form action="/logout" method="post" className="mt-4">
+            <button
+              type="submit"
+              className="command-secondary flex h-9 w-full items-center justify-center text-xs font-black uppercase tracking-[0.12em]"
+            >
+              تسجيل الخروج
+            </button>
+          </form>
         </div>
       </aside>
 
