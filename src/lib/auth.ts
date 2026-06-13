@@ -2,7 +2,8 @@ import crypto from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
-const COOKIE_NAME = "smsm_session";
+export const SESSION_COOKIE_NAME = "smsm_session";
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
 function getSecret() {
   const s = process.env.SESSION_SECRET;
@@ -48,15 +49,12 @@ async function shouldUseSecureCookie() {
 }
 
 async function sessionCookieOptions(maxAge: number) {
-  const expires = new Date(Date.now() + maxAge * 1000);
-
   return {
     httpOnly: true,
     sameSite: "lax" as const,
     secure: await shouldUseSecureCookie(),
     path: "/",
     maxAge,
-    expires,
   };
 }
 
@@ -130,18 +128,21 @@ export function verifyPassword(password: string, stored: string): boolean {
  */
 export async function createSession(userId: string, days = 30) {
   const maxAge = days * 24 * 60 * 60;
+
+  const jar = await cookies();
+  jar.set(SESSION_COOKIE_NAME, createSessionValue(userId, maxAge), await sessionCookieOptions(maxAge));
+}
+
+export function createSessionValue(userId: string, maxAge = SESSION_MAX_AGE) {
   const expiresAt = Date.now() + maxAge * 1000;
   const base = `${userId}.${expiresAt}`;
   const sig = hmac(base);
-  const value = `${base}.${sig}`;
-
-  const jar = await cookies();
-  jar.set(COOKIE_NAME, value, await sessionCookieOptions(maxAge));
+  return `${base}.${sig}`;
 }
 
 export async function destroySession() {
   const jar = await cookies();
-  jar.set(COOKIE_NAME, "", await expiredSessionCookieOptions());
+  jar.set(SESSION_COOKIE_NAME, "", await expiredSessionCookieOptions());
 }
 
 function parseSession(raw: string | undefined | null) {
@@ -166,7 +167,7 @@ function parseSession(raw: string | undefined | null) {
 
 export async function getSessionUser() {
   const jar = await cookies();
-  const raw = jar.get(COOKIE_NAME)?.value ?? null;
+  const raw = jar.get(SESSION_COOKIE_NAME)?.value ?? null;
   const parsed = parseSession(raw);
   if (!parsed) return null;
 

@@ -1,33 +1,6 @@
-import { prisma } from "@/lib/prisma";
-import { createSession, verifyPassword } from "@/lib/auth";
-import { redirect } from "next/navigation";
-
-async function loginAction(formData: FormData) {
-  "use server";
-
-  const username = String(formData.get("username") ?? "").trim();
-  const password = String(formData.get("password") ?? "").trim();
-
-  if (!username || !password) return redirect("/login?e=1");
-
-  const user = await prisma.user.findFirst({
-    where: { username },
-    select: { id: true, passwordHash: true, isActive: true },
-  });
-
-  if (!user) return redirect("/login?e=1");
-  if (user.isActive === false) return redirect("/login?e=2");
-
-  const ok = verifyPassword(password, user.passwordHash);
-  if (!ok) return redirect("/login?e=1");
-
-  await createSession(user.id);
-  redirect("/dashboard");
-}
-
-export default async function LoginPage(props: { searchParams: Promise<{ e?: string }> }) {
+export default async function LoginPage(props: { searchParams: Promise<{ e?: string; error?: string }> }) {
   const sp = await props.searchParams;
-  const e = sp.e ?? "";
+  const e = sp.e ?? sp.error ?? "";
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-4" dir="rtl">
@@ -46,7 +19,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ e?: str
           </div>
         )}
 
-        <form action={loginAction} className="space-y-3">
+        <form action="/login/submit" method="post" className="space-y-3">
           <input
             name="username"
             placeholder="اسم الكريم ايه"
