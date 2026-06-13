@@ -1,8 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
 import type { ReturnType } from "@prisma/client";
 
@@ -25,12 +24,6 @@ type ReplacementItemInput = {
   variantId: string;
   qty: number;
 };
-
-async function requireUser() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-  return user;
-}
 
 function parseJsonArray<T>(raw: string, errorMessage: string): T[] {
   if (!raw) return [];

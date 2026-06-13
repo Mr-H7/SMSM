@@ -1,6 +1,10 @@
 import { getSessionUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
+function normalizeRole(role: unknown) {
+  return String(role ?? "").trim().toUpperCase();
+}
+
 export async function requireUser() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
@@ -9,7 +13,7 @@ export async function requireUser() {
 
 export async function requireOwner() {
   const user = await requireUser();
-  if (user.role !== "OWNER") redirect("/dashboard");
+  if (normalizeRole(user.role) !== "OWNER") redirect("/dashboard");
   return user;
 }
 
@@ -20,7 +24,7 @@ export async function requireOwner() {
 export async function requireOwnerAction() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (user.role !== "OWNER") redirect("/dashboard");
+  if (normalizeRole(user.role) !== "OWNER") redirect("/dashboard");
   return user;
 }
 
@@ -29,6 +33,7 @@ export async function requireOwnerAction() {
  */
 export async function requireSellerOrOwner() {
   const user = await requireUser();
-  if (user.role !== "OWNER" && user.role !== "SELLER") redirect("/dashboard");
+  const role = normalizeRole(user.role);
+  if (role !== "OWNER" && role !== "SELLER") redirect("/dashboard");
   return user;
 }

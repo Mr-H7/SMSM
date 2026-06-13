@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import CommandShell from "@/components/CommandShell";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
@@ -29,7 +28,6 @@ function metricTone(tone: "red" | "blue" | "neutral") {
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  if (!user) redirect("/login");
 
   const todayRange = getCairoDayRange();
   const afterAutoClose = isAfterShiftAutoClose();

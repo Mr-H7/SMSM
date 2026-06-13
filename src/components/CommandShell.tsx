@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import CommandBackButton from "@/components/CommandBackButton";
 
 type CommandShellProps = {
   active: "dashboard" | "pos" | "products" | "invoices" | "reports" | "returns" | "shift" | "targets" | "users";
@@ -111,14 +112,8 @@ export default function CommandShell({ active, user, children }: CommandShellPro
             />
           </form>
 
-          <div className="mr-4 flex items-center gap-4">
-            <div className="hidden h-6 w-px bg-white/[0.06] sm:block" />
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[var(--primary)] shadow-[0_0_18px_rgba(229,9,20,0.8)]" />
-              <span className="text-xs font-black uppercase tracking-[0.14em] text-white/72">
-                المتجر يعمل
-              </span>
-            </div>
+          <div className="mr-4 flex shrink-0 items-center gap-3">
+            <CommandBackButton />
           </div>
         </header>
 
