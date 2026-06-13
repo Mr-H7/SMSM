@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "smsm_session";
 
+function authDebug(event: string, values: Record<string, boolean | number>) {
+  console.info(`[auth:${event}]`, values);
+}
+
 function getSecret() {
   const s = process.env.SESSION_SECRET;
   if (!s) throw new Error("Missing SESSION_SECRET in .env");
@@ -119,6 +123,12 @@ export async function createSession(userId: string, days = 30) {
   const base = `${userId}.${expiresAt}`;
   const sig = hmac(base);
   const value = `${base}.${sig}`;
+  authDebug("createSession", {
+    userId: Boolean(userId),
+    expiresAt,
+    secretExists: Boolean(process.env.SESSION_SECRET),
+    signatureLength: sig.length,
+  });
 
   const jar = await cookies();
   jar.set(COOKIE_NAME, value, await sessionCookieOptions(new Date(expiresAt)));
@@ -152,8 +162,48 @@ function parseSession(raw: string | undefined | null) {
 export async function getSessionUser() {
   const jar = await cookies();
   const raw = jar.get(COOKIE_NAME)?.value ?? null;
-  const parsed = parseSession(raw);
-  if (!parsed) return null;
+  const cookieExists = Boolean(raw);
+  const parts = raw ? raw.split(".") : [];
+  const userId = parts[0] ?? "";
+  const expiresAt = Number(parts[1]);
+  const sig = parts[2] ?? "";
+  const expiresValid = Number.isFinite(expiresAt);
+  const expired = expiresValid ? Date.now() > expiresAt : false;
+  const secretExists = Boolean(process.env.SESSION_SECRET);
+  let expectedSignatureLength = 0;
+  let signatureMatch = false;
+  let parsed: { userId: string } | null = null;
+
+  if (cookieExists && parts.length === 3 && userId && expiresValid && !expired && secretExists) {
+    const base = `${userId}.${expiresAt}`;
+    const expected = hmac(base);
+    expectedSignatureLength = expected.length;
+    signatureMatch = timingSafeEqualHex(expected, sig);
+    if (signatureMatch) {
+      parsed = { userId };
+    }
+  }
+
+  authDebug("getSessionUser:cookie", {
+    cookieExists,
+    partsLength: parts.length,
+    userIdExists: Boolean(userId),
+    expiresValid,
+    expired,
+    secretExists,
+    expectedSignatureLength,
+    providedSignatureLength: sig.length,
+    signatureMatch,
+  });
+
+  if (!parsed) {
+    authDebug("getSessionUser:result", {
+      userFound: false,
+      userActive: false,
+      finalSuccess: false,
+    });
+    return null;
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: parsed.userId },
@@ -164,6 +214,16 @@ export async function getSessionUser() {
       role: true,
       isActive: true,
     },
+  });
+
+  const userFound = Boolean(user);
+  const userActive = Boolean(user && user.isActive !== false);
+  const finalSuccess = userFound && userActive;
+
+  authDebug("getSessionUser:result", {
+    userFound,
+    userActive,
+    finalSuccess,
   });
 
   if (!user) return null;
