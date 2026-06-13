@@ -6,7 +6,15 @@ import SalesNewClient from "./SalesNewClient";
 export const dynamic = "force-dynamic";
 
 export default async function SalesNewPage() {
+  console.info("[page-auth] sales/new", { guard: "requireUser", called: true });
   const user = await requireUser();
+  console.info("[page-auth] sales/new", {
+    userExists: Boolean(user),
+    userIdExists: Boolean(user?.id),
+    userRole: String(user?.role ?? ""),
+    userActive: user?.isActive !== false,
+    pageReachedAfterAuth: true,
+  });
 
   const variants = await prisma.productVariant.findMany({
     where: { isActive: true },

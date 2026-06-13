@@ -6,14 +6,20 @@ function normalizeRole(role: unknown) {
 }
 
 export async function requireUser() {
+  console.info("[rbac] requireUser start", { called: true });
   const user = await getSessionUser();
+  console.info("[rbac] requireUser user", { userExists: Boolean(user) });
   if (!user) redirect("/login");
   return user;
 }
 
 export async function requireOwner() {
+  console.info("[rbac] requireOwner start", { called: true });
   const user = await requireUser();
-  if (normalizeRole(user.role) !== "OWNER") redirect("/dashboard");
+  const role = normalizeRole(user.role);
+  const allowed = role === "OWNER";
+  console.info("[rbac] requireOwner result", { userRole: role, allowed });
+  if (!allowed) redirect("/dashboard");
   return user;
 }
 

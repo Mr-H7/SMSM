@@ -70,7 +70,15 @@ async function resetPasswordAction(formData: FormData) {
 }
 
 export default async function UsersPage() {
+  console.info("[page-auth] users", { guard: "requireOwner", called: true });
   const owner = await requireOwner();
+  console.info("[page-auth] users", {
+    userExists: Boolean(owner),
+    userIdExists: Boolean(owner?.id),
+    userRole: String(owner?.role ?? ""),
+    userActive: owner?.isActive !== false,
+    pageReachedAfterAuth: true,
+  });
   const users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
 
   const owners = users.filter((user) => user.role === "OWNER").length;

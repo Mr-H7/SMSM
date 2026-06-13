@@ -160,7 +160,15 @@ function resultMessage(result: string) {
 }
 
 export default async function ReturnsPage({ searchParams }: { searchParams?: SearchParamsLike }) {
+  console.info("[page-auth] returns", { guard: "requireUser", called: true });
   const user = await requireUser();
+  console.info("[page-auth] returns", {
+    userExists: Boolean(user),
+    userIdExists: Boolean(user?.id),
+    userRole: String(user?.role ?? ""),
+    userActive: user?.isActive !== false,
+    pageReachedAfterAuth: true,
+  });
   const params = await Promise.resolve(searchParams ?? {});
   const q = String(params.q ?? "").trim();
   const result = String(params.result ?? "").trim();

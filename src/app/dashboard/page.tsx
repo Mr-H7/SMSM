@@ -27,7 +27,15 @@ function metricTone(tone: "red" | "blue" | "neutral") {
 }
 
 export default async function DashboardPage() {
+  console.info("[page-auth] dashboard", { guard: "requireUser", called: true });
   const user = await requireUser();
+  console.info("[page-auth] dashboard", {
+    userExists: Boolean(user),
+    userIdExists: Boolean(user?.id),
+    userRole: String(user?.role ?? ""),
+    userActive: user?.isActive !== false,
+    pageReachedAfterAuth: true,
+  });
 
   const todayRange = getCairoDayRange();
   const afterAutoClose = isAfterShiftAutoClose();

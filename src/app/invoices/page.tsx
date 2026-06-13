@@ -47,7 +47,15 @@ function getReturnBadge(returns: Array<{ type: "REFUND" | "EXCHANGE" }>) {
 }
 
 export default async function InvoicesPage(props: { searchParams: Promise<SearchParams> }) {
+  console.info("[page-auth] invoices", { guard: "requireUser", called: true });
   const user = await requireUser();
+  console.info("[page-auth] invoices", {
+    userExists: Boolean(user),
+    userIdExists: Boolean(user?.id),
+    userRole: String(user?.role ?? ""),
+    userActive: user?.isActive !== false,
+    pageReachedAfterAuth: true,
+  });
   const sp = await props.searchParams;
   const q = (sp.q ?? "").trim();
 
