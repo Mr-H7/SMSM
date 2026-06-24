@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import CommandBackButton from "@/components/CommandBackButton";
+import WebOrderNotificationBadge from "@/components/WebOrderNotificationBadge";
+import { prisma } from "@/lib/prisma";
 
 type CommandShellProps = {
-  active: "dashboard" | "pos" | "products" | "invoices" | "reports" | "returns" | "shift" | "targets" | "users";
+  active: "dashboard" | "pos" | "products" | "invoices" | "web-orders" | "messages" | "storefront" | "reports" | "returns" | "shift" | "targets" | "users";
   user?: {
     username?: string | null;
     fullName?: string | null;
@@ -18,17 +20,20 @@ const baseItems = [
   { id: "pos", href: "/sales/new", label: "البيع", mark: "بي" },
   { id: "products", href: "/products", label: "المنتجات", mark: "مخ" },
   { id: "invoices", href: "/invoices", label: "الفواتير", mark: "فو" },
+  { id: "web-orders", href: "/web-orders", label: "طلبات الموقع", mark: "ويب" },
+  { id: "messages", href: "/contact-messages", label: "رسائل الموقع", mark: "رس" },
   { id: "returns", href: "/returns", label: "المرتجعات", mark: "مر" },
   { id: "shift", href: "/shift-close", label: "إنهاء الشيفت", mark: "ش" },
 ] as const;
 
 const ownerItems = [
   { id: "reports", href: "/reports", label: "التقارير", mark: "تق" },
+  { id: "storefront", href: "/storefront-products", label: "منتجات الموقع", mark: "مت" },
   { id: "targets", href: "/targets", label: "الأهداف", mark: "أه" },
   { id: "users", href: "/users", label: "المستخدمون", mark: "مس" },
 ] as const;
 
-export default function CommandShell({ active, user, children }: CommandShellProps) {
+export default async function CommandShell({ active, user, children }: CommandShellProps) {
   const role = String(user?.role ?? user?.userRole ?? "").toUpperCase();
   const isOwner = role === "OWNER";
   const displayName = user?.fullName || user?.username || "Operator";
@@ -39,6 +44,7 @@ export default function CommandShell({ active, user, children }: CommandShellPro
     .slice(0, 2)
     .toUpperCase();
   const navItems = isOwner ? [...baseItems, ...ownerItems] : baseItems;
+  const unseenWebOrders = await prisma.webOrder.count({ where: { seenAt: null } });
 
   return (
     <div className="command-shell min-h-screen text-[var(--foreground)]" dir="rtl">
@@ -73,6 +79,7 @@ export default function CommandShell({ active, user, children }: CommandShellPro
                   {item.mark}
                 </span>
                 <span>{item.label}</span>
+                {item.id === "web-orders" ? <WebOrderNotificationBadge initialCount={unseenWebOrders} /> : null}
               </Link>
             );
           })}

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
@@ -48,7 +49,7 @@ async function shouldUseSecureCookie() {
   );
 }
 
-async function sessionCookieOptions(maxAge: number) {
+export async function sessionCookieOptions(maxAge: number) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
@@ -70,19 +71,17 @@ async function expiredSessionCookieOptions() {
  * pbkdf2$iterations$salt$hashHex  (digest = sha256)
  */
 export function hashPassword(password: string): string {
-  const iterations = 120_000;
-  const salt = crypto.randomBytes(16).toString("hex");
-  const keylen = 32; // 32 bytes => 64 hex chars
-  const digest = "sha256";
-
-  const derived = crypto.pbkdf2Sync(password, salt, iterations, keylen, digest).toString("hex");
-  return `pbkdf2$${iterations}$${salt}$${derived}`;
+  return bcrypt.hashSync(password, 12);
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
   if (!stored || typeof stored !== "string") return false;
 
   try {
+    if (stored.startsWith("$2a$") || stored.startsWith("$2b$") || stored.startsWith("$2y$")) {
+      return bcrypt.compareSync(password, stored);
+    }
+
     if (stored.startsWith("pbkdf2$")) {
       const parts = stored.split("$");
       if (parts.length !== 4) return false;

@@ -1,68 +1,76 @@
-"use server";
+﻿"use server";
 
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
-import type { ReturnType } from "@prisma/client";
+import { z } from "zod";
 
-function normalizeText(v: FormDataEntryValue | null): string {
-  return String(v ?? "").trim();
-}
+const returnedItemInputSchema = z.object({
+  saleItemId: z.string().trim().min(1).max(128),
+  qty: z.coerce.number().int().positive().max(999),
+});
 
-function parseQty(n: unknown): number {
-  const value = Number(n ?? 0);
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.trunc(value));
-}
+const replacementItemInputSchema = z.object({
+  variantId: z.string().trim().min(1).max(128),
+  qty: z.coerce.number().int().positive().max(999),
+});
 
-type ReturnedItemInput = {
-  saleItemId: string;
-  qty: number;
-};
+type ReturnedItemInput = z.infer<typeof returnedItemInputSchema>;
+type ReplacementItemInput = z.infer<typeof replacementItemInputSchema>;
 
-type ReplacementItemInput = {
-  variantId: string;
-  qty: number;
-};
-
-function parseJsonArray<T>(raw: string, errorMessage: string): T[] {
+function parseJsonArray<T>(raw: string, schema: z.ZodType<T>, errorMessage: string): T[] {
   if (!raw) return [];
 
   try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error();
-    return parsed as T[];
+    return z.array(schema).max(200).parse(JSON.parse(raw));
   } catch {
     throw new Error(errorMessage);
   }
 }
 
+const returnFormSchema = z.object({
+  saleId: z.string().trim().min(1).max(128),
+  type: z.preprocess(
+    (value) => String(value ?? "REFUND").trim().toUpperCase(),
+    z.enum(["REFUND", "EXCHANGE"])
+  ),
+  reason: z.string().trim().max(240).optional().transform((value) => value || null),
+  notes: z.string().trim().max(1000).optional().transform((value) => value || null),
+  returnItemsJson: z.string().optional().default("[]"),
+  replacementItemsJson: z.string().optional().default("[]"),
+});
+
+function formObject(formData: FormData) {
+  return Object.fromEntries(formData.entries());
+}
+
 export async function createReturn(formData: FormData) {
   const user = await requireUser();
-
-  const saleId = normalizeText(formData.get("saleId"));
-  const typeRaw = normalizeText(formData.get("type")).toUpperCase();
-  const reason = normalizeText(formData.get("reason")) || null;
-  const notes = normalizeText(formData.get("notes")) || null;
-
-  if (!saleId) throw new Error("رقم الفاتورة مطلوب");
-
-  const type: ReturnType = typeRaw === "EXCHANGE" ? "EXCHANGE" : "REFUND";
+  const {
+    saleId,
+    type,
+    reason,
+    notes,
+    returnItemsJson,
+    replacementItemsJson,
+  } = returnFormSchema.parse(formObject(formData));
 
   const returnItemsRaw = parseJsonArray<ReturnedItemInput>(
-    normalizeText(formData.get("returnItemsJson")),
-    "بيانات المرتجع غير صالحة"
+    returnItemsJson,
+    returnedItemInputSchema,
+    "Invalid return item payload"
   );
 
   const replacementItemsRaw = parseJsonArray<ReplacementItemInput>(
-    normalizeText(formData.get("replacementItemsJson")),
-    "بيانات الاستبدال غير صالحة"
+    replacementItemsJson,
+    replacementItemInputSchema,
+    "Invalid replacement item payload"
   );
 
   const mergedReturned = new Map<string, number>();
   for (const item of returnItemsRaw) {
     const saleItemId = String(item?.saleItemId ?? "").trim();
-    const qty = parseQty(item?.qty);
+    const qty = item.qty;
     if (!saleItemId || qty <= 0) continue;
     mergedReturned.set(saleItemId, (mergedReturned.get(saleItemId) ?? 0) + qty);
   }
@@ -70,7 +78,7 @@ export async function createReturn(formData: FormData) {
   const mergedReplacements = new Map<string, number>();
   for (const item of replacementItemsRaw) {
     const variantId = String(item?.variantId ?? "").trim();
-    const qty = parseQty(item?.qty);
+    const qty = item.qty;
     if (!variantId || qty <= 0) continue;
     mergedReplacements.set(variantId, (mergedReplacements.get(variantId) ?? 0) + qty);
   }
@@ -86,15 +94,15 @@ export async function createReturn(formData: FormData) {
   }));
 
   if (returnItems.length === 0) {
-    throw new Error("لازم تختار منتج واحد على الأقل للمرتجع");
+    throw new Error("Ù„Ø§Ø²Ù… ØªØ®ØªØ§Ø± Ù…Ù†ØªØ¬ ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„ Ù„Ù„Ù…Ø±ØªØ¬Ø¹");
   }
 
   if (type === "EXCHANGE" && replacementItems.length === 0) {
-    throw new Error("لازم تختار منتج واحد على الأقل في الاستبدال");
+    throw new Error("Ù„Ø§Ø²Ù… ØªØ®ØªØ§Ø± Ù…Ù†ØªØ¬ ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„ ÙÙŠ Ø§Ù„Ø§Ø³ØªØ¨Ø¯Ø§Ù„");
   }
 
   if (type === "REFUND" && replacementItems.length > 0) {
-    throw new Error("المرتجع النقدي لا يقبل منتجات استبدال");
+    throw new Error("Ø§Ù„Ù…Ø±ØªØ¬Ø¹ Ø§Ù„Ù†Ù‚Ø¯ÙŠ Ù„Ø§ ÙŠÙ‚Ø¨Ù„ Ù…Ù†ØªØ¬Ø§Øª Ø§Ø³ØªØ¨Ø¯Ø§Ù„");
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -126,7 +134,7 @@ export async function createReturn(formData: FormData) {
       },
     });
 
-    if (!sale) throw new Error("الفاتورة غير موجودة");
+    if (!sale) throw new Error("Ø§Ù„ÙØ§ØªÙˆØ±Ø© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©");
 
     const saleItemMap = new Map(sale.items.map((item) => [item.id, item]));
     const alreadyReturnedMap = new Map<string, number>();
@@ -157,17 +165,17 @@ export async function createReturn(formData: FormData) {
 
     for (const item of returnItems) {
       const saleItem = saleItemMap.get(item.saleItemId);
-      if (!saleItem) throw new Error("فيه منتج غير موجود داخل الفاتورة");
+      if (!saleItem) throw new Error("ÙÙŠÙ‡ Ù…Ù†ØªØ¬ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ Ø¯Ø§Ø®Ù„ Ø§Ù„ÙØ§ØªÙˆØ±Ø©");
 
       const alreadyReturned = alreadyReturnedMap.get(saleItem.id) ?? 0;
       const remainingQty = Math.max(0, saleItem.qty - alreadyReturned);
 
       if (remainingQty <= 0) {
-        throw new Error("فيه منتج تم إرجاعه بالكامل قبل كده");
+        throw new Error("ÙÙŠÙ‡ Ù…Ù†ØªØ¬ ØªÙ… Ø¥Ø±Ø¬Ø§Ø¹Ù‡ Ø¨Ø§Ù„ÙƒØ§Ù…Ù„ Ù‚Ø¨Ù„ ÙƒØ¯Ù‡");
       }
 
       if (item.qty > remainingQty) {
-        throw new Error(`الكمية المرتجعة أكبر من المتبقي. المتاح: ${remainingQty}`);
+        throw new Error(`Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø© Ø£ÙƒØ¨Ø± Ù…Ù† Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ. Ø§Ù„Ù…ØªØ§Ø­: ${remainingQty}`);
       }
 
       const lineTotal = item.qty * saleItem.sellPrice;
@@ -211,10 +219,10 @@ export async function createReturn(formData: FormData) {
 
     for (const item of replacementItems) {
       const variant = replacementVariantMap.get(item.variantId);
-      if (!variant) throw new Error("منتج الاستبدال غير موجود أو غير نشط");
+      if (!variant) throw new Error("Ù…Ù†ØªØ¬ Ø§Ù„Ø§Ø³ØªØ¨Ø¯Ø§Ù„ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ Ø£Ùˆ ØºÙŠØ± Ù†Ø´Ø·");
 
       if (item.qty > variant.stockQty) {
-        throw new Error(`مخزون منتج الاستبدال غير كافٍ. المتاح: ${variant.stockQty}`);
+        throw new Error(`Ù…Ø®Ø²ÙˆÙ† Ù…Ù†ØªØ¬ Ø§Ù„Ø§Ø³ØªØ¨Ø¯Ø§Ù„ ØºÙŠØ± ÙƒØ§ÙÙ. Ø§Ù„Ù…ØªØ§Ø­: ${variant.stockQty}`);
       }
 
       const lineTotal = item.qty * variant.sellPrice;
@@ -286,7 +294,7 @@ export async function createReturn(formData: FormData) {
       });
 
       if (updated.count !== 1) {
-        throw new Error("المخزون اتغير أثناء تنفيذ الاستبدال — حاول مرة تانية");
+        throw new Error("Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø§ØªØºÙŠØ± Ø£Ø«Ù†Ø§Ø¡ ØªÙ†ÙÙŠØ° Ø§Ù„Ø§Ø³ØªØ¨Ø¯Ø§Ù„ â€” Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© ØªØ§Ù†ÙŠØ©");
       }
 
       await tx.saleReturnReplacement.create({
@@ -320,3 +328,4 @@ export async function createReturn(formData: FormData) {
 
   return { ok: true as const, ...result };
 }
+

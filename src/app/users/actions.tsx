@@ -4,38 +4,55 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { requireOwnerAction } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
+import type { Role } from "@prisma/client";
+import { z } from "zod";
 
-function normalizeText(v: FormDataEntryValue | null): string {
-  return String(v ?? "").trim();
-}
+const userRoleSchema = z.enum(["OWNER", "SELLER"]);
+const passwordSchema = z.string().trim().min(6).max(128);
+const idSchema = z.string().trim().min(1).max(128);
 
-function requireStrongPassword(pw: string) {
-  if (pw.length < 6) throw new Error("كلمة المرور لازم تكون 6 أحرف على الأقل");
+const createUserSchema = z.object({
+  username: z.string().trim().min(1).max(80),
+  fullName: z.string().trim().max(120).optional().transform((value) => value || null),
+  role: userRoleSchema.default("SELLER"),
+  password: passwordSchema,
+});
+
+const resetPasswordSchema = z.object({
+  id: idSchema,
+  newPassword: passwordSchema,
+});
+
+const toggleUserSchema = z.object({
+  id: idSchema,
+  next: z.enum(["0", "1"]),
+});
+
+const setRoleSchema = z.object({
+  id: idSchema,
+  role: userRoleSchema,
+});
+
+function formObject(formData: FormData) {
+  return Object.fromEntries(formData.entries());
 }
 
 export async function createUser(formData: FormData) {
   await requireOwnerAction();
 
-  const username = normalizeText(formData.get("username"));
-  const fullName = normalizeText(formData.get("fullName")) || null;
-  const role = normalizeText(formData.get("role")) || "SELLER";
-  const password = normalizeText(formData.get("password"));
-
-  if (!username) throw new Error("اسم المستخدم مطلوب");
-  if (role !== "OWNER" && role !== "SELLER") throw new Error("Role غير صحيح");
-  requireStrongPassword(password);
+  const { username, fullName, role, password } = createUserSchema.parse(formObject(formData));
 
   const exists = await prisma.user.findFirst({
     where: { username },
     select: { id: true },
   });
-  if (exists) throw new Error("اسم المستخدم موجود بالفعل");
+  if (exists) throw new Error("Username already exists");
 
   await prisma.user.create({
     data: {
       username,
       fullName,
-      role: role as any,
+      role: role as Role,
       passwordHash: hashPassword(password),
       isActive: true,
     },
@@ -48,11 +65,7 @@ export async function createUser(formData: FormData) {
 export async function resetUserPassword(formData: FormData) {
   await requireOwnerAction();
 
-  const id = normalizeText(formData.get("id"));
-  const newPassword = normalizeText(formData.get("newPassword"));
-
-  if (!id) throw new Error("Missing id");
-  requireStrongPassword(newPassword);
+  const { id, newPassword } = resetPasswordSchema.parse(formObject(formData));
 
   await prisma.user.update({
     where: { id },
@@ -66,10 +79,7 @@ export async function resetUserPassword(formData: FormData) {
 export async function toggleUserActive(formData: FormData) {
   await requireOwnerAction();
 
-  const id = normalizeText(formData.get("id"));
-  const next = normalizeText(formData.get("next"));
-
-  if (!id) throw new Error("Missing id");
+  const { id, next } = toggleUserSchema.parse(formObject(formData));
 
   const target = await prisma.user.findUnique({
     where: { id },
@@ -77,7 +87,7 @@ export async function toggleUserActive(formData: FormData) {
   });
 
   if (!target) throw new Error("User not found");
-  if (target.role === "OWNER") throw new Error("مينفعش تعطّل OWNER");
+  if (target.role === "OWNER") throw new Error("OWNER users cannot be disabled");
 
   await prisma.user.update({
     where: { id },
@@ -91,15 +101,11 @@ export async function toggleUserActive(formData: FormData) {
 export async function setUserRole(formData: FormData) {
   await requireOwnerAction();
 
-  const id = normalizeText(formData.get("id"));
-  const role = normalizeText(formData.get("role"));
-
-  if (!id) throw new Error("Missing id");
-  if (role !== "OWNER" && role !== "SELLER") throw new Error("Role غير صحيح");
+  const { id, role } = setRoleSchema.parse(formObject(formData));
 
   await prisma.user.update({
     where: { id },
-    data: { role: role as any },
+    data: { role: role as Role },
   });
 
   revalidatePath("/users");

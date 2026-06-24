@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/rbac";
 import { ReturnType as PrismaReturnType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
@@ -22,19 +23,34 @@ function formatEGP(value: number) {
   }).format(Number.isFinite(value) ? value : 0);
 }
 
-function toNumber(value: unknown, fallback = 0) {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : fallback;
+const boundedQty = z.coerce.number().int().min(0).max(999);
+
+const inlineReturnActionSchema = z.object({
+  saleId: z.string().trim().max(128).default(""),
+  searchQ: z.string().trim().max(120).default(""),
+  mode: z.preprocess(
+    (value) => String(value ?? "REFUND").trim().toUpperCase(),
+    z.enum(["REFUND", "EXCHANGE"])
+  ),
+  note: z.string().trim().max(1000).default(""),
+});
+
+const returnsSearchSchema = z.object({
+  q: z.preprocess((value) => Array.isArray(value) ? value[0] : value, z.string().trim().max(120).optional().default("")),
+  result: z.preprocess((value) => Array.isArray(value) ? value[0] : value, z.string().trim().max(80).optional().default("")),
+  refund: z.preprocess((value) => Array.isArray(value) ? value[0] : value, z.coerce.number().min(0).max(100_000_000).optional().default(0)),
+  extra: z.preprocess((value) => Array.isArray(value) ? value[0] : value, z.coerce.number().min(0).max(100_000_000).optional().default(0)),
+});
+
+function formObject(formData: FormData) {
+  return Object.fromEntries(formData.entries());
 }
 
 async function processReturnAction(formData: FormData) {
   "use server";
 
   const user = await requireUser();
-  const saleId = String(formData.get("saleId") ?? "").trim();
-  const searchQ = String(formData.get("searchQ") ?? "").trim();
-  const mode = String(formData.get("mode") ?? "REFUND").trim().toUpperCase();
-  const note = String(formData.get("note") ?? "").trim();
+  const { saleId, searchQ, mode, note } = inlineReturnActionSchema.parse(formObject(formData));
 
   if (!saleId) redirect(`/returns?result=notfound&q=${encodeURIComponent(searchQ)}`);
 
@@ -59,7 +75,7 @@ async function processReturnAction(formData: FormData) {
   const replacementRows: Array<{ variantId: string; qty: number; unitPrice: number; lineTotal: number }> = [];
 
   for (const item of sale.items) {
-    const returnQty = Math.max(0, toNumber(formData.get(`returnQty_${item.id}`)));
+    const returnQty = boundedQty.parse(formData.get(`returnQty_${item.id}`) ?? 0);
     if (returnQty <= 0) continue;
 
     const alreadyReturned = item.returnItems.reduce((sum, row) => sum + row.qty, 0);
@@ -161,11 +177,11 @@ function resultMessage(result: string) {
 
 export default async function ReturnsPage({ searchParams }: { searchParams?: SearchParamsLike }) {
   const user = await requireUser();
-  const params = await Promise.resolve(searchParams ?? {});
-  const q = String(params.q ?? "").trim();
-  const result = String(params.result ?? "").trim();
-  const refund = toNumber(params.refund);
-  const extra = toNumber(params.extra);
+  const params = returnsSearchSchema.parse(await Promise.resolve(searchParams ?? {}));
+  const q = params.q;
+  const result = params.result;
+  const refund = params.refund;
+  const extra = params.extra;
   const today = getCairoDayRange();
 
   const [recentSales, recentReturns, replacementVariants, todayReturns] = await Promise.all([

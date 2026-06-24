@@ -28,6 +28,7 @@ function metricTone(tone: "red" | "blue" | "neutral") {
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  const unseenWebOrders = await prisma.webOrder.count({ where: { seenAt: null } });
 
   const todayRange = getCairoDayRange();
   const afterAutoClose = isAfterShiftAutoClose();
@@ -126,6 +127,19 @@ export default async function DashboardPage() {
             </Link>
           </div>
         </section>
+
+        {unseenWebOrders > 0 ? (
+          <Link
+            href="/web-orders"
+            className="flex items-center justify-between gap-4 border-r-4 border-[var(--primary)] bg-[var(--primary)]/[0.08] px-5 py-4 transition hover:bg-[var(--primary)]/[0.13]"
+          >
+            <div>
+              <div className="command-label text-[var(--primary-soft)]">تنبيه طلبات الموقع</div>
+              <div className="mt-1 text-sm font-black text-white">لديك طلبات جديدة تحتاج مراجعة</div>
+            </div>
+            <span className="command-badge bg-[var(--primary)] text-white">{unseenWebOrders}</span>
+          </Link>
+        ) : null}
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (

@@ -3,58 +3,67 @@
 import { prisma } from "@/lib/prisma";
 import { requireOwnerAction } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
-function toStr(v: FormDataEntryValue | null) {
-  return String(v ?? "").trim();
-}
+const moneyInput = z.preprocess(
+  (value) => String(value ?? "").replace(/[^\d-]/g, ""),
+  z.coerce.number().int().min(0).max(100_000_000)
+);
 
-function toInt(v: FormDataEntryValue | null, fallback = 0) {
-  const raw = toStr(v).replace(/[^\d-]/g, "");
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+const globalTargetsSchema = z.object({
+  dailyTarget: moneyInput,
+  monthlyTarget: moneyInput,
+});
+
+const sellerTargetsSchema = globalTargetsSchema.extend({
+  sellerId: z.string().trim().min(1).max(128),
+});
+
+const sellerIdSchema = z.object({
+  sellerId: z.string().trim().min(1).max(128),
+});
+
+function formObject(formData: FormData) {
+  return Object.fromEntries(formData.entries());
 }
 
 async function ensureTargetTables() {
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS target_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       daily_target INTEGER NOT NULL DEFAULT 15000,
       monthly_target INTEGER NOT NULL DEFAULT 50000,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
+  await prisma.$executeRaw`
     CREATE TABLE IF NOT EXISTS seller_targets (
       seller_id TEXT PRIMARY KEY,
       daily_target INTEGER NOT NULL DEFAULT 0,
       monthly_target INTEGER NOT NULL DEFAULT 0,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
-  `);
+  `;
 
-  await prisma.$executeRawUnsafe(`
-    INSERT OR IGNORE INTO target_settings (id, daily_target, monthly_target)
+  await prisma.$executeRaw`
+    INSERT INTO target_settings (id, daily_target, monthly_target)
     VALUES (1, 15000, 50000)
-  `);
+    ON CONFLICT (id) DO NOTHING
+  `;
 }
 
 export async function updateGlobalTargets(formData: FormData) {
   await requireOwnerAction();
   await ensureTargetTables();
 
-  const dailyTarget = Math.max(0, toInt(formData.get("dailyTarget"), 0));
-  const monthlyTarget = Math.max(0, toInt(formData.get("monthlyTarget"), 0));
+  const { dailyTarget, monthlyTarget } = globalTargetsSchema.parse(formObject(formData));
 
-  await prisma.$executeRawUnsafe(
-    `
-      UPDATE target_settings
-      SET daily_target = ?, monthly_target = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = 1
-    `,
-    dailyTarget,
-    monthlyTarget
-  );
+  await prisma.$executeRaw`
+    UPDATE target_settings
+    SET daily_target = ${dailyTarget}, monthly_target = ${monthlyTarget}, updated_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `;
 
   revalidatePath("/targets");
   return { ok: true };
@@ -64,27 +73,16 @@ export async function updateSellerTargets(formData: FormData) {
   await requireOwnerAction();
   await ensureTargetTables();
 
-  const sellerId = toStr(formData.get("sellerId"));
-  const dailyTarget = Math.max(0, toInt(formData.get("dailyTarget"), 0));
-  const monthlyTarget = Math.max(0, toInt(formData.get("monthlyTarget"), 0));
+  const { sellerId, dailyTarget, monthlyTarget } = sellerTargetsSchema.parse(formObject(formData));
 
-  if (!sellerId) {
-    throw new Error("البائع غير موجود");
-  }
-
-  await prisma.$executeRawUnsafe(
-    `
-      INSERT INTO seller_targets (seller_id, daily_target, monthly_target, updated_at)
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(seller_id) DO UPDATE SET
-        daily_target = excluded.daily_target,
-        monthly_target = excluded.monthly_target,
-        updated_at = CURRENT_TIMESTAMP
-    `,
-    sellerId,
-    dailyTarget,
-    monthlyTarget
-  );
+  await prisma.$executeRaw`
+    INSERT INTO seller_targets (seller_id, daily_target, monthly_target, updated_at)
+    VALUES (${sellerId}, ${dailyTarget}, ${monthlyTarget}, CURRENT_TIMESTAMP)
+    ON CONFLICT (seller_id) DO UPDATE SET
+      daily_target = excluded.daily_target,
+      monthly_target = excluded.monthly_target,
+      updated_at = CURRENT_TIMESTAMP
+  `;
 
   revalidatePath("/targets");
   return { ok: true };
@@ -94,15 +92,9 @@ export async function clearSellerTargets(formData: FormData) {
   await requireOwnerAction();
   await ensureTargetTables();
 
-  const sellerId = toStr(formData.get("sellerId"));
-  if (!sellerId) {
-    throw new Error("البائع غير موجود");
-  }
+  const { sellerId } = sellerIdSchema.parse(formObject(formData));
 
-  await prisma.$executeRawUnsafe(
-    `DELETE FROM seller_targets WHERE seller_id = ?`,
-    sellerId
-  );
+  await prisma.$executeRaw`DELETE FROM seller_targets WHERE seller_id = ${sellerId}`;
 
   revalidatePath("/targets");
   return { ok: true };

@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireOwnerAction } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
+import { notifyStorefrontRevalidation } from "@/lib/storefront-revalidation";
+import { logSecurityEvent } from "@/lib/security";
 
 function t(v: FormDataEntryValue | null) {
   return String(v ?? "").trim();
@@ -21,7 +23,7 @@ function normalizeGrade(raw: string) {
 }
 
 export async function createModel(formData: FormData): Promise<void> {
-  await requireOwnerAction();
+  const user = await requireOwnerAction();
 
   const name = t(formData.get("name"));
   const brand = t(formData.get("brand")) || null;
@@ -29,15 +31,17 @@ export async function createModel(formData: FormData): Promise<void> {
 
   if (!name) throw new Error("اسم الموديل مطلوب");
 
-  await prisma.productModel.create({
+  const model = await prisma.productModel.create({
     data: { name, brand, notes },
   });
+  logSecurityEvent("admin_action", { action: "product_model_created", userId: user.id, modelId: model.id });
 
+  await notifyStorefrontRevalidation();
   revalidatePath("/products");
 }
 
 export async function deleteModel(formData: FormData): Promise<void> {
-  await requireOwnerAction();
+  const user = await requireOwnerAction();
 
   const id = t(formData.get("id"));
   if (!id) throw new Error("معرّف الموديل غير موجود");
@@ -60,12 +64,14 @@ export async function deleteModel(formData: FormData): Promise<void> {
   await prisma.productModel.delete({
     where: { id },
   });
+  logSecurityEvent("admin_action", { action: "product_model_deleted", userId: user.id, modelId: id });
 
+  await notifyStorefrontRevalidation();
   revalidatePath("/products");
 }
 
 export async function createVariant(formData: FormData): Promise<void> {
-  await requireOwnerAction();
+  const user = await requireOwnerAction();
 
   const modelName = t(formData.get("modelName"));
   const brand = t(formData.get("brand")) || null;
@@ -104,7 +110,7 @@ export async function createVariant(formData: FormData): Promise<void> {
     });
   }
 
-  await prisma.productVariant.create({
+  const variant = await prisma.productVariant.create({
     data: {
       modelId: model.id,
       grade,
@@ -118,11 +124,14 @@ export async function createVariant(formData: FormData): Promise<void> {
     },
   });
 
+  logSecurityEvent("admin_action", { action: "product_variant_created", userId: user.id, variantId: variant.id });
+
+  await notifyStorefrontRevalidation();
   revalidatePath("/products");
 }
 
 export async function updateVariant(formData: FormData): Promise<void> {
-  await requireOwnerAction();
+  const user = await requireOwnerAction();
 
   const variantId = t(formData.get("variantId"));
   const modelName = t(formData.get("modelName"));
@@ -168,11 +177,14 @@ export async function updateVariant(formData: FormData): Promise<void> {
     });
   });
 
+  logSecurityEvent("admin_action", { action: "product_variant_updated", userId: user.id, variantId });
+
+  await notifyStorefrontRevalidation();
   revalidatePath("/products");
 }
 
 export async function deleteVariant(formData: FormData): Promise<void> {
-  await requireOwnerAction();
+  const user = await requireOwnerAction();
 
   const id = t(formData.get("id"));
   if (!id) throw new Error("معرّف النسخة غير موجود");
@@ -184,12 +196,14 @@ export async function deleteVariant(formData: FormData): Promise<void> {
       stockQty: 0,
     },
   });
+  logSecurityEvent("admin_action", { action: "product_variant_deactivated", userId: user.id, variantId: id });
 
+  await notifyStorefrontRevalidation();
   revalidatePath("/products");
 }
 
 export async function toggleVariantActive(formData: FormData): Promise<void> {
-  await requireOwnerAction();
+  const user = await requireOwnerAction();
 
   const id = t(formData.get("id"));
   const next = t(formData.get("next"));
@@ -200,12 +214,14 @@ export async function toggleVariantActive(formData: FormData): Promise<void> {
     where: { id },
     data: { isActive: next === "1" },
   });
+  logSecurityEvent("admin_action", { action: "product_variant_active_toggled", userId: user.id, variantId: id, next: next === "1" });
 
+  await notifyStorefrontRevalidation();
   revalidatePath("/products");
 }
 
 export async function restockVariant(formData: FormData): Promise<void> {
-  await requireOwnerAction();
+  const user = await requireOwnerAction();
 
   const id = t(formData.get("id"));
   const qty = int(formData.get("qty"));
@@ -231,6 +247,8 @@ export async function restockVariant(formData: FormData): Promise<void> {
       stockQty: variant.stockQty + qty,
     },
   });
+  logSecurityEvent("admin_action", { action: "product_variant_restocked", userId: user.id, variantId: id, qty });
 
+  await notifyStorefrontRevalidation();
   revalidatePath("/products");
 }

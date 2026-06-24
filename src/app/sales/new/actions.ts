@@ -3,78 +3,68 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
-function normalizeText(v: FormDataEntryValue | null): string {
-  return String(v ?? "").trim();
-}
+const cartItemInputSchema = z.object({
+  variantId: z.string().trim().min(1).max(128),
+  qty: z.coerce.number().int().positive().max(999),
+});
 
-function parseIntSafe(v: FormDataEntryValue | null, fallback = 0): number {
-  const raw = normalizeText(v).replace(/[^\d.-]/g, "").trim();
-  if (!raw) return fallback;
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.trunc(n) : fallback;
-}
+type CartItemInput = z.infer<typeof cartItemInputSchema>;
 
-type CartItemInput = {
-  variantId: string;
-  qty: number;
-};
+const saleFormSchema = z
+  .object({
+    customer: z.string().trim().max(120).optional().transform((value) => value || null),
+    discount: z.preprocess(
+      (value) => String(value ?? "").replace(/[^\d.-]/g, ""),
+      z.coerce.number().int().min(0).max(10_000_000)
+    ),
+    paymentMethod: z.preprocess(
+      (value) => String(value ?? "CASH").trim().toUpperCase(),
+      z.enum(["CASH", "TRANSFER"])
+    ),
+    paymentDescription: z.string().trim().max(240).optional().transform((value) => value || null),
+    itemsJson: z.string().min(1).transform((value, ctx) => {
+      try {
+        return z.array(cartItemInputSchema).min(1).max(200).parse(JSON.parse(value));
+      } catch {
+        ctx.addIssue({ code: "custom", message: "Invalid cart payload" });
+        return z.NEVER;
+      }
+    }),
+  })
+  .superRefine((value, ctx) => {
+    if (value.paymentMethod === "TRANSFER" && !value.paymentDescription) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["paymentDescription"],
+        message: "Transfer details are required",
+      });
+    }
+  });
 
-function normalizePaymentMethod(raw: string): "CASH" | "TRANSFER" {
-  const value = raw.trim().toUpperCase();
-  return value === "TRANSFER" ? "TRANSFER" : "CASH";
+function formObject(formData: FormData) {
+  return Object.fromEntries(formData.entries());
 }
 
 export async function createSale(formData: FormData) {
   const user = await requireUser();
-
-  const customer = normalizeText(formData.get("customer")) || null;
-  const discount = parseIntSafe(formData.get("discount"), 0);
-
-  const paymentMethod = normalizePaymentMethod(
-    normalizeText(formData.get("paymentMethod"))
-  );
-  const paymentDescription =
-    normalizeText(formData.get("paymentDescription")) || null;
-
-  if (paymentMethod === "TRANSFER" && !paymentDescription) {
-    throw new Error("تفاصيل التحويل مطلوبة عند اختيار طريقة الدفع تحويل");
-  }
-
-  const itemsJson = normalizeText(formData.get("itemsJson"));
-  if (!itemsJson) throw new Error("السلة فاضية");
-
-  let items: CartItemInput[];
-  try {
-    items = JSON.parse(itemsJson);
-  } catch {
-    throw new Error("بيانات السلة غير صالحة");
-  }
-
-  if (!Array.isArray(items) || items.length === 0) {
-    throw new Error("السلة فاضية");
-  }
-
-  const cleaned = items
-    .map((it) => ({
-      variantId: String(it?.variantId ?? "").trim(),
-      qty: Math.max(0, Math.trunc(Number(it?.qty ?? 0))),
-    }))
-    .filter((it) => it.variantId && it.qty > 0);
-
-  if (cleaned.length === 0) {
-    throw new Error("السلة فاضية");
-  }
+  const {
+    customer,
+    discount,
+    paymentMethod,
+    paymentDescription,
+    itemsJson: cleaned,
+  } = saleFormSchema.parse(formObject(formData));
 
   const mergedMap = new Map<string, CartItemInput>();
 
   for (const item of cleaned) {
-    const key = item.variantId;
-    const current = mergedMap.get(key);
+    const current = mergedMap.get(item.variantId);
     if (current) {
       current.qty += item.qty;
     } else {
-      mergedMap.set(key, { ...item });
+      mergedMap.set(item.variantId, { ...item });
     }
   }
 

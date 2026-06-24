@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireOwner } from "@/lib/rbac";
+import { z } from "zod";
 
 function toDateOnly(v: string | undefined) {
   const s = String(v ?? "").trim();
@@ -29,14 +30,26 @@ function formatEGP(value: number) {
   }).format(Number.isFinite(value) ? value : 0);
 }
 
+const dateQueryValue = z.preprocess(
+  (value) => Array.isArray(value) ? value[0] : value,
+  z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional().catch(undefined)
+);
+
+const profitSearchSchema = z.object({
+  from: dateQueryValue,
+  to: dateQueryValue,
+});
+
+type ProfitSearchParams = z.input<typeof profitSearchSchema>;
+
 export default async function ProfitReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<ProfitSearchParams>;
 }) {
   await requireOwner();
 
-  const sp = await searchParams;
+  const sp = profitSearchSchema.parse(await searchParams);
 
   const fromInput = toDateOnly(sp.from);
   const toInput = toDateOnly(sp.to);

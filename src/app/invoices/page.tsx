@@ -1,11 +1,20 @@
+import Link from "next/link";
 import CommandShell from "@/components/CommandShell";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
 import { formatCairoDateTime } from "@/lib/cairo-time";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = { q?: string };
+const invoiceSearchSchema = z.object({
+  q: z.preprocess(
+    (value) => Array.isArray(value) ? value[0] : value,
+    z.string().trim().max(120).optional().default("")
+  ),
+});
+
+type SearchParams = z.input<typeof invoiceSearchSchema>;
 
 function formatEGP(value: number) {
   return new Intl.NumberFormat("ar-EG", {
@@ -48,8 +57,8 @@ function getReturnBadge(returns: Array<{ type: "REFUND" | "EXCHANGE" }>) {
 
 export default async function InvoicesPage(props: { searchParams: Promise<SearchParams> }) {
   const user = await requireUser();
-  const sp = await props.searchParams;
-  const q = (sp.q ?? "").trim();
+  const sp = invoiceSearchSchema.parse(await props.searchParams);
+  const q = sp.q;
 
   const sales = await prisma.sale.findMany({
     where: q
@@ -147,9 +156,9 @@ export default async function InvoicesPage(props: { searchParams: Promise<Search
           </div>
           {q ? (
             <div className="md:col-span-12">
-              <a href="/invoices" className="text-xs font-black uppercase tracking-[0.12em] text-white/50 hover:text-white">
+              <Link href="/invoices" className="text-xs font-black uppercase tracking-[0.12em] text-white/50 hover:text-white">
                 مسح التصفية
-              </a>
+              </Link>
             </div>
           ) : null}
         </form>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import CommandShell from "@/components/CommandShell";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/rbac";
+import { z } from "zod";
 import {
   createVariant,
   deleteVariant,
@@ -53,21 +54,38 @@ function swatchText(value: string | null | undefined) {
   return (value || "PR").slice(0, 2).toUpperCase();
 }
 
+const productsSearchSchema = z.object({
+  q: z.preprocess(
+    (value) => Array.isArray(value) ? value[0] : value,
+    z.string().trim().max(120).optional().default("")
+  ),
+  grade: z.preprocess(
+    (value) => String(Array.isArray(value) ? value[0] ?? "" : value ?? "").trim().toUpperCase(),
+    z.enum(["", "ORIGINAL", "MIRROR", "EGYPTIAN"]).default("")
+  ),
+  status: z.preprocess(
+    (value) => String(Array.isArray(value) ? value[0] ?? "" : value ?? "").trim().toLowerCase(),
+    z.enum(["", "low", "out", "inactive"]).default("")
+  ),
+});
+
+type ProductsSearchParams = z.input<typeof productsSearchSchema>;
+
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; grade?: string; status?: string }>;
+  searchParams?: Promise<ProductsSearchParams>;
 }) {
   const user = await requireUser();
   const role = String(user?.role ?? "").toUpperCase();
   const isOwner = role === "OWNER";
 
-  const sp = await Promise.resolve(
-    searchParams ?? Promise.resolve({} as { q?: string; grade?: string; status?: string })
+  const sp = productsSearchSchema.parse(
+    await Promise.resolve(searchParams ?? Promise.resolve({} as ProductsSearchParams))
   );
-  const q = String(sp.q ?? "").trim().toLowerCase();
-  const gradeFilter = String(sp.grade ?? "").trim().toUpperCase();
-  const statusFilter = String(sp.status ?? "").trim().toLowerCase();
+  const q = sp.q.toLowerCase();
+  const gradeFilter = sp.grade;
+  const statusFilter = sp.status;
 
   const variants = await prisma.productVariant.findMany({
     orderBy: [{ updatedAt: "desc" }],

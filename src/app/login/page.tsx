@@ -1,5 +1,14 @@
-export default async function LoginPage(props: { searchParams: Promise<{ e?: string; error?: string }> }) {
-  const sp = await props.searchParams;
+import { z } from "zod";
+
+const loginSearchSchema = z.object({
+  e: z.preprocess((value) => Array.isArray(value) ? value[0] : value, z.enum(["1", "2"]).optional()),
+  error: z.preprocess((value) => Array.isArray(value) ? value[0] : value, z.enum(["1", "2"]).optional()),
+});
+
+type LoginSearchParams = z.input<typeof loginSearchSchema>;
+
+export default async function LoginPage(props: { searchParams: Promise<LoginSearchParams> }) {
+  const sp = loginSearchSchema.parse(await props.searchParams);
   const e = sp.e ?? sp.error ?? "";
 
   return (

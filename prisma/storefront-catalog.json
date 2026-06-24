@@ -1,0 +1,1742 @@
+{
+  "categories": [
+    {
+      "slug": "sneakers",
+      "nameAr": "سنيكرز",
+      "nameEn": "Sneakers"
+    },
+    {
+      "slug": "sport-shoes",
+      "nameAr": "أحذية رياضية",
+      "nameEn": "Sport Shoes"
+    },
+    {
+      "slug": "casual-shoes",
+      "nameAr": "أحذية كاجوال",
+      "nameEn": "Casual Shoes"
+    },
+    {
+      "slug": "running",
+      "nameAr": "جري وأداء",
+      "nameEn": "Running"
+    },
+    {
+      "slug": "luxury-sneakers",
+      "nameAr": "سنيكرز فاخر",
+      "nameEn": "Luxury Sneakers"
+    },
+    {
+      "slug": "air-max",
+      "nameAr": "اير ماكس",
+      "nameEn": "Air Max"
+    },
+    {
+      "slug": "jordan",
+      "nameAr": "جوردن",
+      "nameEn": "Jordan"
+    },
+    {
+      "slug": "adidas",
+      "nameAr": "أديداس",
+      "nameEn": "Adidas"
+    },
+    {
+      "slug": "new-balance",
+      "nameAr": "نيو بالنس",
+      "nameEn": "New Balance"
+    }
+  ],
+  "products": [
+    {
+      "approvedSku": "SMSM-MIR-ADZ-001",
+      "canonicalModelName": "ادزيرو",
+      "slug": "adidas-adizero-mirror",
+      "categorySlug": "adidas",
+      "nameAr": "أدزيرو",
+      "nameEn": "Adizero",
+      "shortDescriptionAr": "أدزيرو بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Adizero with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف أدزيرو من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Adizero from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "أدزيرو | SMSM STORE",
+      "seoTitleEn": "Adizero | SMSM STORE",
+      "seoDescriptionAr": "تسوق أدزيرو من SMSM STORE.",
+      "seoDescriptionEn": "Shop Adizero at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/ADIDAS%20ADZIRO/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/ADIDAS%20ADZIRO/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/ADIDAS%20ADZIRO/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/ADIDAS%20ADZIRO/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AFBR-002",
+      "canonicalModelName": "ايرفورس اسود ف احمر",
+      "slug": "nike-air-force-black-red-mirror",
+      "categorySlug": "sneakers",
+      "nameAr": "اير فورس أسود في أحمر",
+      "nameEn": "Air Force Black Red",
+      "shortDescriptionAr": "اير فورس أسود في أحمر بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Air Force Black Red with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف اير فورس أسود في أحمر من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Air Force Black Red from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "Red"
+      ],
+      "compareAtPrice": 1550,
+      "badge": "OFFER",
+      "featured": false,
+      "isOffer": true,
+      "seoTitleAr": "اير فورس أسود في أحمر | SMSM STORE",
+      "seoTitleEn": "Air Force Black Red | SMSM STORE",
+      "seoDescriptionAr": "تسوق اير فورس أسود في أحمر من SMSM STORE.",
+      "seoDescriptionEn": "Shop Air Force Black Red at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20BLACK%20RED/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20BLACK%20RED/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20BLACK%20RED/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20BLACK%20RED/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20BLACK%20RED/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20BLACK%20RED/SOLE.png",
+          "angle": "SOLE",
+          "sortOrder": 5
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AFWL-003",
+      "canonicalModelName": "اير فورس كوالتي",
+      "slug": "nike-air-force-white-limited-mirror",
+      "categorySlug": "sneakers",
+      "nameAr": "اير فورس أبيض ليمتد",
+      "nameEn": "Air Force White Limited",
+      "shortDescriptionAr": "اير فورس أبيض ليمتد بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Air Force White Limited with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف اير فورس أبيض ليمتد من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Air Force White Limited from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "اير فورس أبيض ليمتد | SMSM STORE",
+      "seoTitleEn": "Air Force White Limited | SMSM STORE",
+      "seoDescriptionAr": "تسوق اير فورس أبيض ليمتد من SMSM STORE.",
+      "seoDescriptionEn": "Shop Air Force White Limited at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20LIMITED/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20LIMITED/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20LIMITED/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20LIMITED/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AFWM-004",
+      "canonicalModelName": "ايرفورس ابيض ميرور",
+      "slug": "nike-air-force-white-mirror-molten",
+      "categorySlug": "sneakers",
+      "nameAr": "اير فورس أبيض ميرور مولتن",
+      "nameEn": "Air Force White Mirror Molten",
+      "shortDescriptionAr": "اير فورس أبيض ميرور مولتن بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Air Force White Mirror Molten with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف اير فورس أبيض ميرور مولتن من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Air Force White Mirror Molten from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "BESTSELLER",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "اير فورس أبيض ميرور مولتن | SMSM STORE",
+      "seoTitleEn": "Air Force White Mirror Molten | SMSM STORE",
+      "seoDescriptionAr": "تسوق اير فورس أبيض ميرور مولتن من SMSM STORE.",
+      "seoDescriptionEn": "Shop Air Force White Mirror Molten at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20MIRROR%20MOLTEN%20METAL/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20MIRROR%20MOLTEN%20METAL/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20MIRROR%20MOLTEN%20METAL/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20MIRROR%20MOLTEN%20METAL/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20MIRROR%20MOLTEN%20METAL/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        },
+        {
+          "path": "/images/SHOES/AIR%20FORCE%20WHITE%20MIRROR%20MOLTEN%20METAL/SOLE.png",
+          "angle": "SOLE",
+          "sortOrder": 5
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AM95C-005",
+      "canonicalModelName": "اير ماكس 95",
+      "slug": "nike-air-max-95-cortz-mirror",
+      "categorySlug": "air-max",
+      "nameAr": "اير ماكس 95 كورتز",
+      "nameEn": "Air Max 95 Cortz",
+      "shortDescriptionAr": "اير ماكس 95 كورتز بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Air Max 95 Cortz with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف اير ماكس 95 كورتز من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Air Max 95 Cortz from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "Gray"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "اير ماكس 95 كورتز | SMSM STORE",
+      "seoTitleEn": "Air Max 95 Cortz | SMSM STORE",
+      "seoDescriptionAr": "تسوق اير ماكس 95 كورتز من SMSM STORE.",
+      "seoDescriptionEn": "Shop Air Max 95 Cortz at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20CORTZ/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20CORTZ/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20CORTZ/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20CORTZ/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AM95W-006",
+      "canonicalModelName": "اير ماكس 95",
+      "slug": "nike-air-max-95-limited-white",
+      "categorySlug": "air-max",
+      "nameAr": "اير ماكس 95 ليمتد وايت",
+      "nameEn": "Air Max 95 Limited White",
+      "shortDescriptionAr": "اير ماكس 95 ليمتد وايت بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Air Max 95 Limited White with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف اير ماكس 95 ليمتد وايت من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Air Max 95 Limited White from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "White",
+        "Gray"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "اير ماكس 95 ليمتد وايت | SMSM STORE",
+      "seoTitleEn": "Air Max 95 Limited White | SMSM STORE",
+      "seoDescriptionAr": "تسوق اير ماكس 95 ليمتد وايت من SMSM STORE.",
+      "seoDescriptionEn": "Shop Air Max 95 Limited White at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20LIMITED%20WHITE/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20LIMITED%20WHITE/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20LIMITED%20WHITE/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20LIMITED%20WHITE/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AM95S-007",
+      "canonicalModelName": "اير ماكس 95",
+      "slug": "nike-air-max-95-sayna-mirror",
+      "categorySlug": "air-max",
+      "nameAr": "اير ماكس 95 ساينا",
+      "nameEn": "Air Max 95 Sayna",
+      "shortDescriptionAr": "اير ماكس 95 ساينا بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Air Max 95 Sayna with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف اير ماكس 95 ساينا من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Air Max 95 Sayna from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Gray",
+        "Black"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "اير ماكس 95 ساينا | SMSM STORE",
+      "seoTitleEn": "Air Max 95 Sayna | SMSM STORE",
+      "seoDescriptionAr": "تسوق اير ماكس 95 ساينا من SMSM STORE.",
+      "seoDescriptionEn": "Shop Air Max 95 Sayna at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20SAYNA/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20SAYNA/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20SAYNA/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2095%20SAYNA/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AM97-008",
+      "canonicalModelName": "اير ماكس 97",
+      "slug": "nike-air-max-97-mirror",
+      "categorySlug": "air-max",
+      "nameAr": "اير ماكس 97",
+      "nameEn": "Air Max 97",
+      "shortDescriptionAr": "اير ماكس 97 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Air Max 97 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف اير ماكس 97 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Air Max 97 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Silver",
+        "White"
+      ],
+      "compareAtPrice": 1700,
+      "badge": "OFFER",
+      "featured": false,
+      "isOffer": true,
+      "seoTitleAr": "اير ماكس 97 | SMSM STORE",
+      "seoTitleEn": "Air Max 97 | SMSM STORE",
+      "seoDescriptionAr": "تسوق اير ماكس 97 من SMSM STORE.",
+      "seoDescriptionEn": "Shop Air Max 97 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/AIR%20MAX%2097/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2097/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2097/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2097/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2097/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%2097/SOLE.png",
+          "angle": "SOLE",
+          "sortOrder": 5
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AM720-009",
+      "canonicalModelName": "ايرماكس720فرنيه",
+      "slug": "nike-air-max-720-mirror",
+      "categorySlug": "air-max",
+      "nameAr": "اير ماكس 720",
+      "nameEn": "Air Max 720",
+      "shortDescriptionAr": "اير ماكس 720 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Air Max 720 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف اير ماكس 720 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Air Max 720 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "Silver"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "اير ماكس 720 | SMSM STORE",
+      "seoTitleEn": "Air Max 720 | SMSM STORE",
+      "seoDescriptionAr": "تسوق اير ماكس 720 من SMSM STORE.",
+      "seoDescriptionEn": "Shop Air Max 720 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/AIR%20MAX%20720/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%20720/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%20720/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%20720/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%20720/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AM2021-010",
+      "canonicalModelName": "ايرماكسam",
+      "slug": "nike-air-max-2021-se-mirror",
+      "categorySlug": "air-max",
+      "nameAr": "اير ماكس 2021 SE",
+      "nameEn": "Air Max 2021 SE",
+      "shortDescriptionAr": "اير ماكس 2021 SE بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Air Max 2021 SE with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف اير ماكس 2021 SE من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Air Max 2021 SE from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "اير ماكس 2021 SE | SMSM STORE",
+      "seoTitleEn": "Air Max 2021 SE | SMSM STORE",
+      "seoDescriptionAr": "تسوق اير ماكس 2021 SE من SMSM STORE.",
+      "seoDescriptionEn": "Shop Air Max 2021 SE at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/AIR%20MAX%202021%20SE/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%202021%20SE/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%202021%20SE/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/AIR%20MAX%202021%20SE/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-AMQ-011",
+      "canonicalModelName": "الكسندر",
+      "slug": "alexander-mcqueen-oversized-mirror",
+      "categorySlug": "luxury-sneakers",
+      "nameAr": "الكسندر ماكوين",
+      "nameEn": "Oversized Sneaker",
+      "shortDescriptionAr": "الكسندر ماكوين بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Oversized Sneaker with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف الكسندر ماكوين من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Oversized Sneaker from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "الكسندر ماكوين | SMSM STORE",
+      "seoTitleEn": "Oversized Sneaker | SMSM STORE",
+      "seoDescriptionAr": "تسوق الكسندر ماكوين من SMSM STORE.",
+      "seoDescriptionEn": "Shop Oversized Sneaker at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/ALEXANDER%20MCQUEEN/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/ALEXANDER%20MCQUEEN/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/ALEXANDER%20MCQUEEN/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/ALEXANDER%20MCQUEEN/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-ASX-012",
+      "canonicalModelName": "اسكس",
+      "slug": "asics-runner-mirror",
+      "categorySlug": "running",
+      "nameAr": "أسكس",
+      "nameEn": "Asics",
+      "shortDescriptionAr": "أسكس بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Asics with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف أسكس من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Asics from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "White",
+        "Black"
+      ],
+      "compareAtPrice": null,
+      "badge": "BESTSELLER",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "أسكس | SMSM STORE",
+      "seoTitleEn": "Asics | SMSM STORE",
+      "seoDescriptionAr": "تسوق أسكس من SMSM STORE.",
+      "seoDescriptionEn": "Shop Asics at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/ASICS/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/ASICS/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/ASICS/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/ASICS/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-B22-013",
+      "canonicalModelName": "b22",
+      "slug": "dior-b22-mirror",
+      "categorySlug": "luxury-sneakers",
+      "nameAr": "B22",
+      "nameEn": "B22",
+      "shortDescriptionAr": "B22 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "B22 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف B22 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover B22 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "White",
+        "Gray"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "B22 | SMSM STORE",
+      "seoTitleEn": "B22 | SMSM STORE",
+      "seoDescriptionAr": "تسوق B22 من SMSM STORE.",
+      "seoDescriptionEn": "Shop B22 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/B22/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/B22/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/B22/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/B22/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-BTRK-014",
+      "canonicalModelName": "بالنسياجا تراك",
+      "slug": "balenciaga-track-sneaker-mirror",
+      "categorySlug": "luxury-sneakers",
+      "nameAr": "بالنسياجا تراك",
+      "nameEn": "Track Sneaker",
+      "shortDescriptionAr": "بالنسياجا تراك بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Track Sneaker with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف بالنسياجا تراك من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Track Sneaker from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "Gray"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "بالنسياجا تراك | SMSM STORE",
+      "seoTitleEn": "Track Sneaker | SMSM STORE",
+      "seoDescriptionAr": "تسوق بالنسياجا تراك من SMSM STORE.",
+      "seoDescriptionEn": "Shop Track Sneaker at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/BALENCIAGA%20TRACK/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/BALENCIAGA%20TRACK/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/BALENCIAGA%20TRACK/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/BALENCIAGA%20TRACK/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/BALENCIAGA%20TRACK/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        },
+        {
+          "path": "/images/SHOES/BALENCIAGA%20TRACK/SOLE.png",
+          "angle": "SOLE",
+          "sortOrder": 5
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-BAPE-015",
+      "canonicalModelName": "بايب",
+      "slug": "bape-style-mirror",
+      "categorySlug": "casual-shoes",
+      "nameAr": "بايب",
+      "nameEn": "Style",
+      "shortDescriptionAr": "بايب بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Style with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف بايب من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Style from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "بايب | SMSM STORE",
+      "seoTitleEn": "Style | SMSM STORE",
+      "seoDescriptionAr": "تسوق بايب من SMSM STORE.",
+      "seoDescriptionEn": "Shop Style at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/BAPE/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/BAPE/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/BAPE/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/BAPE/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-J4-016",
+      "canonicalModelName": "جوردن4",
+      "slug": "jordan-4-mirror",
+      "categorySlug": "jordan",
+      "nameAr": "جوردن 4",
+      "nameEn": "4",
+      "shortDescriptionAr": "جوردن 4 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "4 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف جوردن 4 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover 4 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "BESTSELLER",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "جوردن 4 | SMSM STORE",
+      "seoTitleEn": "4 | SMSM STORE",
+      "seoDescriptionAr": "تسوق جوردن 4 من SMSM STORE.",
+      "seoDescriptionEn": "Shop 4 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/JORDAN%204/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/JORDAN%204/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/JORDAN%204/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/JORDAN%204/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/JORDAN%204/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        },
+        {
+          "path": "/images/SHOES/JORDAN%204/SOLE.png",
+          "angle": "SOLE",
+          "sortOrder": 5
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-J11-017",
+      "canonicalModelName": "جوردن 11",
+      "slug": "jordan-11-mirror",
+      "categorySlug": "jordan",
+      "nameAr": "جوردن 11",
+      "nameEn": "11",
+      "shortDescriptionAr": "جوردن 11 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "11 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف جوردن 11 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover 11 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "جوردن 11 | SMSM STORE",
+      "seoTitleEn": "11 | SMSM STORE",
+      "seoDescriptionAr": "تسوق جوردن 11 من SMSM STORE.",
+      "seoDescriptionEn": "Shop 11 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/JORDAN%2011/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/JORDAN%2011/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/JORDAN%2011/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/JORDAN%2011/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/JORDAN%2011/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        },
+        {
+          "path": "/images/SHOES/JORDAN%2011/SOLE.png",
+          "angle": "SOLE",
+          "sortOrder": 5
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-J13-018",
+      "canonicalModelName": "جوردن 13",
+      "slug": "jordan-13-mirror",
+      "categorySlug": "jordan",
+      "nameAr": "جوردن 13",
+      "nameEn": "13",
+      "shortDescriptionAr": "جوردن 13 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "13 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف جوردن 13 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover 13 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "Red"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "جوردن 13 | SMSM STORE",
+      "seoTitleEn": "13 | SMSM STORE",
+      "seoDescriptionAr": "تسوق جوردن 13 من SMSM STORE.",
+      "seoDescriptionEn": "Shop 13 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/JORDAN%2013/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/JORDAN%2013/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/JORDAN%2013/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/JORDAN%2013/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/JORDAN%2013/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-LVSK-019",
+      "canonicalModelName": "لوي فيتون",
+      "slug": "louis-vuitton-skate-sneaker",
+      "categorySlug": "luxury-sneakers",
+      "nameAr": "LV سكايت",
+      "nameEn": "LV Skate",
+      "shortDescriptionAr": "LV سكايت بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "LV Skate with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف LV سكايت من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover LV Skate from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "White",
+        "Brown"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "LV سكايت | SMSM STORE",
+      "seoTitleEn": "LV Skate | SMSM STORE",
+      "seoDescriptionAr": "تسوق LV سكايت من SMSM STORE.",
+      "seoDescriptionEn": "Shop LV Skate at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/LV%20SKATE/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/LV%20SKATE/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/LV%20SKATE/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/LV%20SKATE/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-LVTR-020",
+      "canonicalModelName": "لوي فيتون",
+      "slug": "louis-vuitton-trainer-sneaker",
+      "categorySlug": "luxury-sneakers",
+      "nameAr": "LV ترينر",
+      "nameEn": "LV Trainer",
+      "shortDescriptionAr": "LV ترينر بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "LV Trainer with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف LV ترينر من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover LV Trainer from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "White",
+        "Black"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "LV ترينر | SMSM STORE",
+      "seoTitleEn": "LV Trainer | SMSM STORE",
+      "seoDescriptionAr": "تسوق LV ترينر من SMSM STORE.",
+      "seoDescriptionEn": "Shop LV Trainer at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/LV%20TRAINER/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/LV%20TRAINER/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/LV%20TRAINER/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/LV%20TRAINER/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/LV%20TRAINER/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-NB530-021",
+      "canonicalModelName": "نيو بالنس 530",
+      "slug": "new-balance-530-mirror",
+      "categorySlug": "new-balance",
+      "nameAr": "NB 530",
+      "nameEn": "NB 530",
+      "shortDescriptionAr": "NB 530 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "NB 530 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف NB 530 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover NB 530 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "White",
+        "Navy"
+      ],
+      "compareAtPrice": null,
+      "badge": "BESTSELLER",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "NB 530 | SMSM STORE",
+      "seoTitleEn": "NB 530 | SMSM STORE",
+      "seoDescriptionAr": "تسوق NB 530 من SMSM STORE.",
+      "seoDescriptionEn": "Shop NB 530 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%20530/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%20530/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%20530/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%20530/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%20530/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%20530/SOLE.png",
+          "angle": "SOLE",
+          "sortOrder": 5
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-NB2000-022",
+      "canonicalModelName": "2000",
+      "slug": "new-balance-2000-mirror",
+      "categorySlug": "new-balance",
+      "nameAr": "NB 2000",
+      "nameEn": "NB 2000",
+      "shortDescriptionAr": "NB 2000 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "NB 2000 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف NB 2000 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover NB 2000 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Gray",
+        "Black"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "NB 2000 | SMSM STORE",
+      "seoTitleEn": "NB 2000 | SMSM STORE",
+      "seoDescriptionAr": "تسوق NB 2000 من SMSM STORE.",
+      "seoDescriptionEn": "Shop NB 2000 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%202000/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%202000/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%202000/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%202000/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%202000/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-NB9060-023",
+      "canonicalModelName": "9060",
+      "slug": "new-balance-9060-mirror",
+      "categorySlug": "new-balance",
+      "nameAr": "NB 9060",
+      "nameEn": "NB 9060",
+      "shortDescriptionAr": "NB 9060 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "NB 9060 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف NB 9060 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover NB 9060 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Gray",
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "BESTSELLER",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "NB 9060 | SMSM STORE",
+      "seoTitleEn": "NB 9060 | SMSM STORE",
+      "seoDescriptionAr": "تسوق NB 9060 من SMSM STORE.",
+      "seoDescriptionEn": "Shop NB 9060 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%209060/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%209060/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%209060/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%209060/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/NEW%20BALANCE%209060/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-SHX-024",
+      "canonicalModelName": "شوكس",
+      "slug": "nike-shox-mirror",
+      "categorySlug": "sport-shoes",
+      "nameAr": "شوكس",
+      "nameEn": "Shox",
+      "shortDescriptionAr": "شوكس بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Shox with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف شوكس من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Shox from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "Red"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "شوكس | SMSM STORE",
+      "seoTitleEn": "Shox | SMSM STORE",
+      "seoDescriptionAr": "تسوق شوكس من SMSM STORE.",
+      "seoDescriptionEn": "Shop Shox at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/NIKE%20SHOX/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/NIKE%20SHOX/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/NIKE%20SHOX/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/NIKE%20SHOX/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-SHXS-025",
+      "canonicalModelName": "شوكس سوبريم",
+      "slug": "nike-shox-supreme-mirror",
+      "categorySlug": "sport-shoes",
+      "nameAr": "شوكس سوبريم",
+      "nameEn": "Shox Supreme",
+      "shortDescriptionAr": "شوكس سوبريم بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Shox Supreme with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف شوكس سوبريم من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Shox Supreme from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "Red"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "شوكس سوبريم | SMSM STORE",
+      "seoTitleEn": "Shox Supreme | SMSM STORE",
+      "seoDescriptionAr": "تسوق شوكس سوبريم من SMSM STORE.",
+      "seoDescriptionEn": "Shop Shox Supreme at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/NIKE%20SHOX%20SUPREME/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/NIKE%20SHOX%20SUPREME/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/NIKE%20SHOX%20SUPREME/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/NIKE%20SHOX%20SUPREME/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-VM-026",
+      "canonicalModelName": "في ام",
+      "slug": "nike-vm-sneaker-mirror",
+      "categorySlug": "sport-shoes",
+      "nameAr": "VM",
+      "nameEn": "VM",
+      "shortDescriptionAr": "VM بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "VM with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف VM من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover VM from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "VM | SMSM STORE",
+      "seoTitleEn": "VM | SMSM STORE",
+      "seoDescriptionAr": "تسوق VM من SMSM STORE.",
+      "seoDescriptionEn": "Shop VM at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/NIKE%20VM/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/NIKE%20VM/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/NIKE%20VM/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/NIKE%20VM/REAR.png",
+          "angle": "REAR",
+          "sortOrder": 3
+        },
+        {
+          "path": "/images/SHOES/NIKE%20VM/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 4
+        },
+        {
+          "path": "/images/SHOES/NIKE%20VM/SOLE.png",
+          "angle": "SOLE",
+          "sortOrder": 5
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-TN1-027",
+      "canonicalModelName": "تي ان 1",
+      "slug": "nike-tn-1-mirror",
+      "categorySlug": "sport-shoes",
+      "nameAr": "TN1",
+      "nameEn": "TN1",
+      "shortDescriptionAr": "TN1 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "TN1 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف TN1 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover TN1 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "Orange"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "TN1 | SMSM STORE",
+      "seoTitleEn": "TN1 | SMSM STORE",
+      "seoDescriptionAr": "تسوق TN1 من SMSM STORE.",
+      "seoDescriptionEn": "Shop TN1 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/TN%201/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/TN%201/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/TN%201/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/TN%201/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-TN3-028",
+      "canonicalModelName": "تي ان 3",
+      "slug": "nike-tn-3-mirror",
+      "categorySlug": "sport-shoes",
+      "nameAr": "TN3",
+      "nameEn": "TN3",
+      "shortDescriptionAr": "TN3 بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "TN3 with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف TN3 من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover TN3 from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "Blue"
+      ],
+      "compareAtPrice": null,
+      "badge": "NEW",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "TN3 | SMSM STORE",
+      "seoTitleEn": "TN3 | SMSM STORE",
+      "seoDescriptionAr": "تسوق TN3 من SMSM STORE.",
+      "seoDescriptionEn": "Shop TN3 at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/TN%203/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/TN%203/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/TN%203/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/TN%203/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-TSB-029",
+      "canonicalModelName": "اس بي",
+      "slug": "nike-travis-sb-mirror",
+      "categorySlug": "casual-shoes",
+      "nameAr": "ترافيس SB",
+      "nameEn": "Travis SB",
+      "shortDescriptionAr": "ترافيس SB بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Travis SB with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف ترافيس SB من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Travis SB from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Brown",
+        "Black"
+      ],
+      "compareAtPrice": null,
+      "badge": "LIMITED",
+      "featured": false,
+      "isOffer": false,
+      "seoTitleAr": "ترافيس SB | SMSM STORE",
+      "seoTitleEn": "Travis SB | SMSM STORE",
+      "seoDescriptionAr": "تسوق ترافيس SB من SMSM STORE.",
+      "seoDescriptionEn": "Shop Travis SB at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/TRAVIS%20SB/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/TRAVIS%20SB/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/TRAVIS%20SB/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/TRAVIS%20SB/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    },
+    {
+      "approvedSku": "SMSM-MIR-ADISTAR-030",
+      "canonicalModelName": "اديداس اديستار",
+      "slug": "adidas-adistar-mirror",
+      "categorySlug": "adidas",
+      "nameAr": "أديستار",
+      "nameEn": "Adistar",
+      "shortDescriptionAr": "أديستار بخامة عالية وتفاصيل مناسبة للاستخدام اليومي.",
+      "shortDescriptionEn": "Adistar with premium materials and everyday comfort.",
+      "descriptionAr": "اكتشف أديستار من مجموعة SMSM STORE المختارة، بتفاصيل عملية ومقاسات متعددة.",
+      "descriptionEn": "Discover Adistar from the approved SMSM STORE collection, with versatile styling and multiple sizes.",
+      "sizes": [
+        "40",
+        "41",
+        "42",
+        "43",
+        "45"
+      ],
+      "colors": [
+        "Black",
+        "White"
+      ],
+      "compareAtPrice": null,
+      "badge": "BESTSELLER",
+      "featured": true,
+      "isOffer": false,
+      "seoTitleAr": "أديستار | SMSM STORE",
+      "seoTitleEn": "Adistar | SMSM STORE",
+      "seoDescriptionAr": "تسوق أديستار من SMSM STORE.",
+      "seoDescriptionEn": "Shop Adistar at SMSM STORE.",
+      "images": [
+        {
+          "path": "/images/SHOES/ADIDAS%20ADISTAR/FRONT.png",
+          "angle": "FRONT",
+          "sortOrder": 0
+        },
+        {
+          "path": "/images/SHOES/ADIDAS%20ADISTAR/LEFT.png",
+          "angle": "LEFT",
+          "sortOrder": 1
+        },
+        {
+          "path": "/images/SHOES/ADIDAS%20ADISTAR/RIGHT.png",
+          "angle": "RIGHT",
+          "sortOrder": 2
+        },
+        {
+          "path": "/images/SHOES/ADIDAS%20ADISTAR/TOP.png",
+          "angle": "TOP",
+          "sortOrder": 3
+        }
+      ]
+    }
+  ]
+}

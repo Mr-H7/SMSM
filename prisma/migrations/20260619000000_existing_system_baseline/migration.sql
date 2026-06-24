@@ -1,0 +1,1 @@
+-- Baseline marker for the existing SMSM PostgreSQL schema. Intentionally contains no DDL.
